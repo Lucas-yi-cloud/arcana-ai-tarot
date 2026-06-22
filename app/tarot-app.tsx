@@ -1,0 +1,1443 @@
+"use client";
+
+/* eslint-disable @next/next/no-img-element */
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
+
+type Route =
+  | "home"
+  | "detail"
+  | "question"
+  | "draw"
+  | "result"
+  | "history"
+  | "about"
+  | "privacy"
+  | "contact";
+type DrawPhase = "idle" | "shuffling" | "dealt";
+type Plan = "year" | "quarter";
+
+type User = {
+  id: string;
+  email: string;
+  freeUsed: number;
+  subscribed: boolean;
+  subscription: {
+    plan: string;
+    status: string;
+    currentPeriodEnd: number | null;
+  } | null;
+};
+
+type DrawnCard = TarotCard & {
+  key: string;
+  reversed: boolean;
+  flipped: boolean;
+  posLabel: string;
+  posDesc: string;
+  x: number;
+  y: number;
+  rot?: number;
+};
+
+type SavedReading = {
+  id: string;
+  spreadId: string;
+  spreadName: string;
+  question: string;
+  createdAt: number;
+  payload: {
+    cards: DrawnCard[];
+    synthesis: string;
+  };
+};
+
+type PayPalConfig = {
+  env: "sandbox" | "live";
+  clientId: string;
+  enabled: boolean;
+  plans: Record<Plan, string>;
+};
+
+type PayPalApproveData = {
+  subscriptionID?: string;
+  subscriptionId?: string;
+};
+
+type PayPalActions = {
+  subscription: {
+    create: (payload: { plan_id: string }) => Promise<string>;
+  };
+};
+
+type PayPalButtons = {
+  render: (selector: string) => Promise<void> | void;
+};
+
+declare global {
+  interface Window {
+    paypal?: {
+      Buttons: (options: {
+        style?: Record<string, string>;
+        createSubscription: (
+          data: unknown,
+          actions: PayPalActions
+        ) => Promise<string>;
+        onApprove: (data: PayPalApproveData) => void | Promise<void>;
+        onError: () => void;
+      }) => PayPalButtons;
+    };
+  }
+}
+
+const prompts = [
+  "Where is this relationship heading?",
+  "What should I focus on this month?",
+  "What am I not seeing?",
+  "Is this the right move for my career?",
+];
+
+const faqs = [
+  {
+    q: "How does Arcana AI's tarot AI actually work?",
+    a: "You pick a spread and ask a question, then shuffle and draw. Arcana AI looks at the specific cards you pulled, each card's position in the spread, and whether it landed upright or reversed, then writes an interpretation for every card and a final synthesis tying the whole reading to your question.",
+  },
+  {
+    q: "Is an AI tarot reading accurate?",
+    a: "Tarot is best treated as a mirror for reflection, not a fixed prediction. Arcana AI stays accurate to the deck by applying traditional Rider-Waite meanings to your draw and using the symbolism to help you think about your situation more clearly.",
+  },
+  {
+    q: "Are these real tarot cards?",
+    a: "Yes. Arcana AI uses the Rider-Waite-Smith Major Arcana with upright and reversed meanings, plus spread positions that mirror how readers structure a real session.",
+  },
+  {
+    q: "Which tarot spread should I choose?",
+    a: "For a quick check-in, try Daily Draw or Yes / No. For a situation unfolding over time, choose Past · Present · Future. For love, work, decisions, or a full deep dive, choose the matching spread and read the position guide before you begin.",
+  },
+  {
+    q: "Is Arcana AI free to use?",
+    a: "You can begin with two free readings. After that, Arcana Pro unlocks unlimited readings through a PayPal subscription linked to your account.",
+  },
+];
+
+function LogoMark() {
+  return (
+    <svg viewBox="0 0 24 22" width="20" height="18" aria-hidden="true">
+      <path
+        d="M17.9 8c-1.6 0-2.3 2.7-3 5.6-.2.8-.4 1.6-.6 2.2-.2.5-.4.8-.6.8s-.4-.3-.6-.8c-.2-.6-.4-1.4-.6-2.2-.1-.4-.2-.8-.3-1.2-.04-.16-.2-.27-.36-.26-.23.004-.4.22-.34.44.1.42.2.84.3 1.26.45 1.8.87 3.5 1.96 3.5s1.5-1.7 1.95-3.49c.33-1.3.66-2.65 1.07-3.63.4-.96.83-1.45 1.26-1.45s.86.49 1.26 1.45c.15.37.3.79.43 1.24.05.18.24.29.42.24.2-.05.3-.25.25-.44C19.5 9.6 18.8 8 17.65 8z"
+        fill="currentColor"
+      />
+      <path
+        d="M11.25 9.5c.07.22-.09.45-.32.46-.16.01-.31-.09-.36-.24C10.37 9.06 10.16 8.46 9.94 7.92 9.25 6.27 8.52 5.47 7.72 5.47S6.2 6.27 5.5 7.92C5 9.1 4.59 10.6 4.19 12.18c-.04.14.01.28.12.37.34.26.56.67.56 1.13a1.43 1.43 0 0 1-1.53 1.42 1.43 1.43 0 0 1-.18-2.84c.14-.02.26-.12.29-.26C4.5 8.1 5.59 4.75 7.72 4.75c1.66 0 2.69 2.01 3.53 4.74z"
+        fill="#fff"
+      />
+      <path
+        d="M5.29 12.6c.1.16.3.22.47.14 1.57-.8 3.42-1.38 6.25-1.38.87 0 1.65.05 2.35.15.17.02.34-.09.39-.26.06-.2-.08-.42-.29-.45-.74-.1-1.55-.16-2.45-.16-2.96 0-4.93.63-6.57 1.46-.18.09-.25.32-.15.5z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
+function CardBack() {
+  return (
+    <div className="tarot-back card-back-art">
+      <svg width="42" height="42" viewBox="0 0 72 72" fill="none" stroke="#f0d693" strokeWidth="2">
+        <circle cx="36" cy="36" r="30" opacity=".55" />
+        <path d="M36 5l3.6 27.4L67 36l-27.4 3.6L36 67l-3.6-27.4L5 36l27.4-3.6z" />
+      </svg>
+    </div>
+  );
+}
+
+function TarotImage({ card, reversed = false }: { card: TarotCard; reversed?: boolean }) {
+  return (
+    <div className="tarot-card" style={{ width: "100%", height: "100%" }}>
+      <img
+        alt={card.name}
+        src={cardImage(card.num, card.name)}
+        style={{ transform: reversed ? "rotate(180deg)" : undefined }}
+      />
+    </div>
+  );
+}
+
+function getSynthesis(cards: DrawnCard[], question: string, spread: Spread) {
+  if (!cards.length) return "";
+  const first = cards[0];
+  const last = cards[cards.length - 1];
+  const firstWord = (first.reversed ? first.rev : first.up)[0];
+  const lastWord = (last.reversed ? last.rev : last.up)[0];
+  const opener = question.trim()
+    ? `On “${question.trim()}”, the deck answers in layers.`
+    : "Without a fixed question, the cards read the season you are in.";
+  if (spread.id === "yesno") {
+    const positive = !first.reversed && ["sun", "star", "wheel", "heart"].includes(first.glyph);
+    return `${opener} The answer leans ${
+      positive ? "yes" : "not yet"
+    }. ${first.name} points to ${firstWord}, so the real message is less about force and more about timing.`;
+  }
+  return `${opener} The reading begins with ${firstWord} and resolves toward ${lastWord}. ${spread.name} is asking you to notice how the first impulse can mature into the final card's lesson.`;
+}
+
+function drawCards(spread: Spread) {
+  const indexes = deck.map((_, index) => index);
+  for (let i = indexes.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indexes[i], indexes[j]] = [indexes[j], indexes[i]];
+  }
+
+  return spread.positions.map((position, index) => {
+    const card = deck[indexes[index]];
+    return {
+      ...card,
+      key: `${position.label}-${card.num}-${index}`,
+      reversed: Math.random() < 0.32,
+      flipped: false,
+      posLabel: position.label,
+      posDesc: position.desc,
+      x: position.x,
+      y: position.y,
+      rot: position.rot,
+    };
+  });
+}
+
+function SeoSection({
+  openFaq,
+  onToggleFaq,
+}: {
+  openFaq: number;
+  onToggleFaq: (index: number) => void;
+}) {
+  const pillars = [
+    {
+      title: "Readings grounded in experience",
+      copy: "The flow mirrors a real tarot session: choose a spread, set an intention, draw, reveal, then read each card in context.",
+      icon: (
+        <path d="M16 4l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" />
+      ),
+    },
+    {
+      title: "Rooted in the Rider-Waite tradition",
+      copy: "Every card follows the symbolic language of the classic Rider-Waite-Smith deck, including upright and reversed meanings.",
+      icon: (
+        <>
+          <path d="M5 24l-2-13 7 6 6-10 6 10 7-6-2 13z" />
+          <path d="M5 27h22" />
+        </>
+      ),
+    },
+    {
+      title: "Every spread, fully explained",
+      copy: "From a one-card Daily Draw to the Celtic Cross and Year Ahead, each position is named, explained, and woven into one synthesis.",
+      icon: (
+        <>
+          <circle cx="16" cy="16" r="11" />
+          <circle cx="16" cy="16" r="3" />
+          <path d="M16 5v8M16 19v8M5 16h8M19 16h8" />
+        </>
+      ),
+    },
+    {
+      title: "Private and judgment-free",
+      copy: "Your account protects saved readings and subscription access, while the experience stays calm, reflective, and ad-free.",
+      icon: (
+        <>
+          <path d="M16 4l11 4v8c0 7-5 11-11 12-6-1-11-5-11-12V8z" />
+          <path d="M11 16l3.5 3.5L21 13" />
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <section className="seo-block">
+      <div className="seo-intro">
+        <div className="seo-copy">
+          <span className="seo-kicker">TAROT AI, DONE RIGHT</span>
+          <h2 className="serif">
+            A tarot AI built for a real reading, not a random card generator
+          </h2>
+          <p>
+            Arcana AI turns the centuries-old practice of tarot into a guided digital
+            ritual. Choose from fourteen spreads, hold your question, and draw from the
+            Rider-Waite Major Arcana. Every <strong>AI tarot reading</strong> interprets
+            the exact cards you drew, their position, their orientation, and the question
+            you asked.
+          </p>
+          <p>
+            Where many <strong>tarot AI</strong> tools return generic blurbs, Arcana AI
+            reads the whole spread as one story: how the cards relate, what tension runs
+            between them, and where the reading points next.
+          </p>
+        </div>
+        <div className="seo-art starfield" aria-hidden="true">
+          <div className="hero-aura" />
+          <div className="seo-art-inner">
+            {[
+              ["02", "The High Priestess", -18, 1],
+              ["19", "The Sun", 0, 3],
+              ["17", "The Star", 18, 1],
+            ].map(([num, name, rot, z]) => (
+              <div
+                className="seo-fan-card tarot-card"
+                key={name}
+                style={{
+                  transform: `translateX(-50%) rotate(${rot}deg)`,
+                  zIndex: Number(z),
+                  width: name === "The Sun" ? 92 : 86,
+                  height: name === "The Sun" ? 148 : 138,
+                  bottom: name === "The Sun" ? 52 : 44,
+                }}
+              >
+                <img alt={String(name)} src={cardImage(String(num), String(name))} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="pillar-grid">
+        {pillars.map((pillar) => (
+          <article className="pillar-card" key={pillar.title}>
+            <div className="pillar-head">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 32 32"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {pillar.icon}
+              </svg>
+              <h3>{pillar.title}</h3>
+            </div>
+            <p>{pillar.copy}</p>
+          </article>
+        ))}
+      </div>
+
+      <div className="faq-wrap">
+        <h2 className="serif">AI tarot reading — questions, answered</h2>
+        <div className="faq-list">
+          {faqs.map((faq, index) => {
+            const isOpen = openFaq === index;
+            return (
+              <article className="faq-item" key={faq.q}>
+                <button className="faq-question" onClick={() => onToggleFaq(index)}>
+                  <h3>{faq.q}</h3>
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+                {isOpen && <p className="faq-answer">{faq.a}</p>}
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SiteFooter({
+  onOpenSpread,
+  onGoHome,
+  onOpenPaywall,
+  onRoute,
+}: {
+  onOpenSpread: (id: string) => void;
+  onGoHome: () => void;
+  onOpenPaywall: () => void;
+  onRoute: (route: Route) => void;
+}) {
+  const readingLinks = [
+    ["daily", "Daily Draw"],
+    ["past-present-future", "Past · Present · Future"],
+    ["celtic-cross", "Celtic Cross"],
+    ["love-connection", "Love & Connection"],
+  ];
+  const moreLinks = [
+    ["career-path", "Career & Path"],
+    ["mind-body-spirit", "Mind · Body · Spirit"],
+    ["year-ahead", "Year Ahead"],
+    ["relationship-mirror", "Relationship Mirror"],
+  ];
+
+  return (
+    <footer className="site-footer">
+      <div className="footer-grid">
+        <div>
+          <div className="footer-brand">
+            <span className="footer-mark">
+              <LogoMark />
+            </span>
+            <span style={{ fontSize: 17, fontWeight: 650 }}>Arcana</span>
+            <span className="serif" style={{ color: "#cdbff0", fontSize: 17, fontStyle: "italic" }}>
+              AI
+            </span>
+          </div>
+          <p className="footer-copy">
+            AI-guided tarot readings drawn from the classic Rider-Waite deck. Ask a
+            question, draw your cards, and hear what you already know.
+          </p>
+          <button className="white-btn" style={{ padding: "10px 18px", fontSize: 13.5 }} onClick={onGoHome}>
+            Begin a reading →
+          </button>
+        </div>
+        <div>
+          <div className="footer-title">READINGS</div>
+          <div className="footer-links">
+            {readingLinks.map(([id, label]) => (
+              <button key={id} onClick={() => onOpenSpread(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="footer-title">MORE SPREADS</div>
+          <div className="footer-links">
+            {moreLinks.map(([id, label]) => (
+              <button key={id} onClick={() => onOpenSpread(id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="footer-title">ARCANA</div>
+          <div className="footer-links">
+            <button onClick={onOpenPaywall}>Arcana Pro</button>
+            <button onClick={() => onRoute("about")}>About</button>
+            <button onClick={() => onRoute("privacy")}>Privacy</button>
+            <button onClick={() => onRoute("contact")}>Contact</button>
+          </div>
+        </div>
+      </div>
+      <div className="footer-bottom">
+        <span>
+          © 2026 Arcana AI · For reflection and entertainment. You are the author of
+          your own choices.
+        </span>
+        <nav aria-label="Footer">
+          <button onClick={() => onRoute("about")}>About</button>
+          <button onClick={() => onRoute("privacy")}>Privacy</button>
+          <button onClick={() => onRoute("contact")}>Contact</button>
+          <span>18+</span>
+        </nav>
+      </div>
+    </footer>
+  );
+}
+
+function AboutPage({ onBack, onBegin }: { onBack: () => void; onBegin: () => void }) {
+  return (
+    <main className="content-page">
+      <button className="text-btn" onClick={onBack}>
+        ‹ Back to spreads
+      </button>
+      <div style={{ marginTop: 24 }}>
+        <span className="content-kicker">ABOUT</span>
+        <h1 className="serif">A quieter way to ask the cards</h1>
+        <p>
+          Arcana AI began with a simple idea: a tarot reading should feel like a
+          real conversation, not a fortune-cookie generator. We pair the
+          time-honored symbolism of the Rider-Waite-Smith deck with an AI reader
+          that interprets the exact cards you draw in the context of your question.
+        </p>
+        <p>
+          Every spread follows a traditional structure, from a single daily card to
+          the full ten-card Celtic Cross. The reader explains each card by position
+          before weaving the whole spread into one clear reflection.
+        </p>
+        <h2 className="serif">What we believe</h2>
+        <p>
+          Tarot is not about predicting a fixed future. It is a mirror that helps
+          you see your situation more honestly. Arcana AI is built to prompt
+          reflection, never to make decisions for you.
+        </p>
+        <p>
+          We keep the experience calm, ad-free, and account-protected, so your
+          saved readings and subscription access stay connected to you.
+        </p>
+        <button className="primary-btn" style={{ marginTop: 14, borderRadius: 14 }} onClick={onBegin}>
+          Begin a reading →
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function PrivacyPage({ onBack }: { onBack: () => void }) {
+  const sections = [
+    {
+      title: "Account and login",
+      copy: "Arcana AI uses email one-time codes for login. We store your email, a hashed session token, and basic timestamps so you can safely return to your journal.",
+    },
+    {
+      title: "Your questions and readings",
+      copy: "Saved readings are linked to your account so your journal can persist across sessions. Keep questions personal, but avoid entering sensitive legal, medical, or financial details.",
+    },
+    {
+      title: "Payments",
+      copy: "PayPal processes payment details. Arcana AI stores only the PayPal subscription identifier, plan, status, and renewal timing needed to unlock Pro access.",
+    },
+    {
+      title: "Cookies",
+      copy: "We use a secure session cookie with HttpOnly and SameSite=Lax settings. It keeps you signed in without exposing the session token to browser JavaScript.",
+    },
+    {
+      title: "Questions about your data",
+      copy: "Reach us at privacy@arcana.ai for account, billing, or data questions. Replace this placeholder with your final policy before launch.",
+    },
+  ];
+
+  return (
+    <main className="content-page">
+      <button className="text-btn" onClick={onBack}>
+        ‹ Back to spreads
+      </button>
+      <div style={{ marginTop: 24 }}>
+        <span className="content-kicker">PRIVACY</span>
+        <h1 className="serif" style={{ marginBottom: 8 }}>
+          Your readings stay yours
+        </h1>
+        <p style={{ color: "var(--soft)", fontSize: 14 }}>Last updated June 2026</p>
+        <p>
+          Arcana AI is designed to keep the product useful without collecting more
+          than the app needs. This page is a product-facing draft and should be
+          reviewed before launch.
+        </p>
+        <div className="content-sections">
+          {sections.map((section) => (
+            <section className="content-section" key={section.title}>
+              <h2>{section.title}</h2>
+              <p>{section.copy}</p>
+            </section>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function ContactPage({ onBack }: { onBack: () => void }) {
+  return (
+    <main className="content-page">
+      <button className="text-btn" onClick={onBack}>
+        ‹ Back to spreads
+      </button>
+      <div style={{ marginTop: 24 }}>
+        <span className="content-kicker">CONTACT</span>
+        <h1 className="serif">We&apos;d love to hear from you</h1>
+        <p>
+          Questions, feedback, or a spread you would love to see? Reach out. A real
+          person should read every message once this goes live.
+        </p>
+        <div className="contact-grid">
+          <article className="contact-card">
+            <h2 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 650 }}>
+              General & support
+            </h2>
+            <p style={{ color: "var(--muted)" }}>
+              hello<span>@</span>arcana.ai
+            </p>
+          </article>
+          <article className="contact-card">
+            <h2 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 650 }}>
+              Billing & privacy
+            </h2>
+            <p style={{ color: "var(--muted)" }}>
+              privacy<span>@</span>arcana.ai
+            </p>
+          </article>
+        </div>
+        <div className="contact-note">
+          <h2 style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 650 }}>
+            Response time
+          </h2>
+          <p>
+            We typically reply within two business days. For account or payment
+            issues, include the email you used at checkout so support can find you
+            faster.
+          </p>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function TarotApp() {
+  const [route, setRoute] = useState<Route>("home");
+  const [spreadId, setSpreadId] = useState(spreads[0].id);
+  const [question, setQuestion] = useState("");
+  const [cards, setCards] = useState<DrawnCard[]>([]);
+  const [drawPhase, setDrawPhase] = useState<DrawPhase>("idle");
+  const [user, setUser] = useState<User | null>(null);
+  const [freeLimit, setFreeLimit] = useState(2);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authCode, setAuthCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [devCode, setDevCode] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<Plan>("year");
+  const [pendingDraw, setPendingDraw] = useState(false);
+  const [paypalConfig, setPaypalConfig] = useState<PayPalConfig | null>(null);
+  const [paypalMessage, setPaypalMessage] = useState("");
+  const [history, setHistory] = useState<SavedReading[]>([]);
+  const [toast, setToast] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [openFaq, setOpenFaq] = useState(0);
+  const beginDrawRef = useRef<() => Promise<void>>(async () => undefined);
+
+  const spread = useMemo(
+    () => spreads.find((item) => item.id === spreadId) ?? spreads[0],
+    [spreadId]
+  );
+  const synthesis = useMemo(() => getSynthesis(cards, question, spread), [cards, question, spread]);
+
+  async function refreshMe() {
+    const response = await fetch("/api/me");
+    const data = (await response.json()) as { user: User | null; freeLimit: number };
+    setUser(data.user);
+    setFreeLimit(data.freeLimit);
+  }
+
+  function flash(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2600);
+  }
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      fetch("/api/me").then((res) => res.json()) as Promise<{
+        user: User | null;
+        freeLimit: number;
+      }>,
+      fetch("/api/paypal/config").then((res) => res.json()) as Promise<PayPalConfig>,
+    ]).then(([me, config]) => {
+      if (!active) return;
+      setUser(me.user);
+      setFreeLimit(me.freeLimit);
+      setPaypalConfig(config);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (route !== "history" || !user) return;
+    let active = true;
+    void fetch("/api/readings")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { readings: SavedReading[] } | null) => {
+        if (active && data) setHistory(data.readings);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [route, user]);
+
+  useEffect(() => {
+    if (!showPaywall || !user || !paypalConfig?.clientId || !paypalConfig.enabled) return;
+
+    const scriptId = "paypal-sdk";
+    const renderButtons = () => {
+      const container = document.getElementById("paypal-buttons");
+      if (!container || !window.paypal) return;
+      container.innerHTML = "";
+      window.paypal
+        .Buttons({
+          style: {
+            layout: "vertical",
+            shape: "pill",
+            label: "subscribe",
+          },
+          createSubscription: async (_data, actions) =>
+            actions.subscription.create({
+              plan_id: paypalConfig.plans[selectedPlan],
+            }),
+          onApprove: async (data) => {
+            const subscriptionId = data.subscriptionID ?? data.subscriptionId ?? "";
+            setPaypalMessage("Confirming your PayPal subscription...");
+            const response = await fetch("/api/paypal/confirm-subscription", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subscriptionId, plan: selectedPlan }),
+            });
+            if (!response.ok) {
+              setPaypalMessage("PayPal approved, but server confirmation failed.");
+              return;
+            }
+            await refreshMe();
+            setShowPaywall(false);
+            flash("Subscription linked. PayPal will keep membership status in sync.");
+            if (pendingDraw) {
+              setPendingDraw(false);
+              window.setTimeout(() => void beginDrawRef.current(), 250);
+            }
+          },
+          onError: () => {
+            setPaypalMessage("PayPal checkout could not be opened. Please try again.");
+          },
+        })
+        .render("#paypal-buttons");
+    };
+
+    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (existing) {
+      if (window.paypal) renderButtons();
+      else existing.addEventListener("load", renderButtons, { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
+      paypalConfig.clientId
+    )}&vault=true&intent=subscription`;
+    script.onload = renderButtons;
+    document.body.appendChild(script);
+  }, [showPaywall, user, paypalConfig, selectedPlan, pendingDraw]);
+
+  function openSpread(id: string) {
+    setSpreadId(id);
+    setRoute("detail");
+    window.scrollTo({ top: 0 });
+  }
+
+  function goHome() {
+    setRoute("home");
+    window.scrollTo({ top: 0 });
+  }
+
+  function beginAtSpreads() {
+    setRoute("home");
+    window.setTimeout(() => {
+      document.getElementById("spreads")?.scrollIntoView({ behavior: "smooth" });
+    }, 0);
+  }
+
+  function goRoute(nextRoute: Route) {
+    setRoute(nextRoute);
+    window.scrollTo({ top: 0 });
+  }
+
+  async function beginDraw() {
+    if (!user) {
+      setAuthOpen(true);
+      setPendingDraw(true);
+      return;
+    }
+
+    const response = await fetch("/api/readings/begin", { method: "POST" });
+    if (response.status === 402) {
+      setShowPaywall(true);
+      setPendingDraw(true);
+      return;
+    }
+    if (!response.ok) {
+      flash("Could not start the reading. Please sign in again.");
+      return;
+    }
+
+    await refreshMe();
+    setRoute("draw");
+    setDrawPhase("shuffling");
+    setCards([]);
+    window.scrollTo({ top: 0 });
+    window.setTimeout(() => {
+      setCards(drawCards(spread));
+      setDrawPhase("dealt");
+    }, 1200);
+  }
+
+  useEffect(() => {
+    beginDrawRef.current = beginDraw;
+  });
+
+  async function requestCode() {
+    setAuthMessage("");
+    setDevCode("");
+    const response = await fetch("/api/auth/request-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: authEmail }),
+    });
+    const data = (await response.json()) as { error?: string; devCode?: string };
+    if (!response.ok) {
+      setAuthMessage(data.error ?? "Could not send code");
+      return;
+    }
+    setCodeSent(true);
+    setDevCode(data.devCode ?? "");
+    setAuthMessage("Enter the 6-digit code from your email.");
+  }
+
+  async function verifyCode() {
+    setAuthMessage("");
+    const response = await fetch("/api/auth/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: authEmail, code: authCode }),
+    });
+    const data = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setAuthMessage(data.error ?? "Could not verify code");
+      return;
+    }
+    await refreshMe();
+    setAuthOpen(false);
+    setCodeSent(false);
+    setAuthCode("");
+    flash("Signed in securely.");
+    if (pendingDraw) {
+      setPendingDraw(false);
+      window.setTimeout(() => void beginDraw(), 200);
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
+    setHistory([]);
+    flash("Signed out.");
+  }
+
+  async function saveReading() {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    setSaving(true);
+    const response = await fetch("/api/readings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        spreadId: spread.id,
+        spreadName: spread.name,
+        question,
+        cards,
+        synthesis,
+      }),
+    });
+    setSaving(false);
+    if (!response.ok) {
+      flash("Could not save this reading.");
+      return;
+    }
+    flash("Reading saved to your journal.");
+  }
+
+  function openSaved(reading: SavedReading) {
+    setSpreadId(reading.spreadId);
+    setQuestion(reading.question);
+    setCards(reading.payload.cards.map((card) => ({ ...card, flipped: true })));
+    setRoute("result");
+    window.scrollTo({ top: 0 });
+  }
+
+  const planName = selectedPlan === "year" ? "Annual Pass" : "Quarterly Pass";
+
+  return (
+    <div className="app-shell">
+      <nav className="top-nav">
+        <button className="brand" onClick={goHome} aria-label="Arcana AI home">
+          <span className="brand-mark">
+            <LogoMark />
+          </span>
+          <span>Arcana</span>
+          <span className="brand-ai serif">AI</span>
+        </button>
+        <div className="nav-links">
+          <button
+            className={`nav-pill ${route !== "history" ? "active" : ""}`}
+            onClick={goHome}
+          >
+            Spreads
+          </button>
+          <button
+            className={`nav-pill ${route === "history" ? "active" : ""}`}
+            onClick={() => setRoute("history")}
+          >
+            Journals
+          </button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {user?.subscribed ? (
+            <div className="pro-pill">
+              <span style={{ color: "var(--gold-bright)" }}>PRO</span>
+              <span style={{ color: "rgba(255,255,255,.62)", fontWeight: 600 }}>
+                Active
+              </span>
+            </div>
+          ) : (
+            <button className="purple-pill" onClick={() => setShowPaywall(true)}>
+              <span style={{ color: "var(--gold-bright)" }}>↯</span>
+              <span>Go Unlimited</span>
+            </button>
+          )}
+          <button className="avatar" onClick={() => (user ? void logout() : setAuthOpen(true))}>
+            {user ? user.email.slice(0, 1).toUpperCase() : "M"}
+          </button>
+        </div>
+      </nav>
+
+      {route === "home" && (
+        <main className="page">
+          <section className="hero starfield">
+            <div className="hero-content">
+              <div className="eyebrow">
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--gold-bright)",
+                    boxShadow: "0 0 8px var(--gold-bright)",
+                  }}
+                />
+                AI-GUIDED TAROT
+              </div>
+              <h1 className="serif">
+                Ask the cards<span style={{ color: "#cdbff0" }}>.</span>
+                <br />
+                Hear what you
+                <br />
+                <span style={{ color: "#e0d8ff", fontStyle: "italic" }}>already know.</span>
+              </h1>
+              <p>
+                Choose a spread, hold your question, and let an AI reader interpret the
+                Rider-Waite deck just for you.
+              </p>
+              <button
+                className="white-btn"
+                onClick={beginAtSpreads}
+              >
+                Begin a reading →
+              </button>
+            </div>
+            <div className="hero-fan" aria-hidden="true">
+              <div className="hero-aura" />
+              <div className="fan-float">
+                {[
+                  ["06", "The Lovers", -28, 0],
+                  ["18", "The Moon", -14, 1],
+                  ["19", "The Sun", 0, 3],
+                  ["17", "The Star", 14, 1],
+                  ["10", "Wheel of Fortune", 28, 0],
+                ].map(([num, name, rot, z]) => (
+                  <div
+                    className="fan-card tarot-card"
+                    key={name}
+                    style={{
+                      transform: `translateX(-50%) rotate(${rot}deg)`,
+                      zIndex: Number(z),
+                      width: name === "The Sun" ? 96 : 92,
+                      height: name === "The Sun" ? 154 : 148,
+                      bottom: name === "The Sun" ? 22 : 18,
+                    }}
+                  >
+                    <img alt={String(name)} src={cardImage(String(num), String(name))} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <div className="section-head" id="spreads">
+            <h2>Choose your spread</h2>
+            <span>
+              {user?.subscribed
+                ? "Unlimited readings active"
+                : `${Math.max(0, freeLimit - (user?.freeUsed ?? 0))} free readings left`}
+            </span>
+          </div>
+          <div className="spread-grid">
+            {spreads.map((item) => (
+              <button className="spread-card" key={item.id} onClick={() => openSpread(item.id)}>
+                <div className="spread-preview starfield">
+                  <span className="preview-label">
+                    {item.count} {item.count === 1 ? "card" : "cards"}
+                  </span>
+                  {item.tag && <span className="preview-badge">{item.tag}</span>}
+                  {item.positions.map((position, index) => (
+                    <span
+                      className="mini-card"
+                      key={`${item.id}-${position.label}`}
+                      style={{
+                        left: `${position.x}%`,
+                        top: `${position.y}%`,
+                        transform: `translate(-50%, -50%) rotate(${position.rot ?? 0}deg) scale(${
+                          item.count >= 10 ? 0.6 : item.count >= 6 ? 0.82 : 1
+                        })`,
+                        animation: `tarot-bob ${3.4 + (index % 3) * 0.5}s ease-in-out infinite`,
+                        animationDelay: `${index * 0.25}s`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="spread-body">
+                  <h3>{item.name}</h3>
+                  <p>{item.blurb}</p>
+                  <div className="spread-foot">
+                    <span>{user?.subscribed ? "UNLIMITED" : ""}</span>
+                    <span>Read ›</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <SeoSection openFaq={openFaq} onToggleFaq={(index) => setOpenFaq((current) => (current === index ? -1 : index))} />
+          <SiteFooter
+            onOpenSpread={openSpread}
+            onGoHome={beginAtSpreads}
+            onOpenPaywall={() => setShowPaywall(true)}
+            onRoute={goRoute}
+          />
+        </main>
+      )}
+
+      {route === "detail" && (
+        <main className="page">
+          <button className="text-btn" onClick={goHome}>
+            ‹ All spreads
+          </button>
+          <div className="detail-grid" style={{ marginTop: 22 }}>
+            <section className="stage layout-panel starfield">
+              <span className="preview-label">SPREAD LAYOUT</span>
+              <div className="layout-area">
+                {spread.positions.map((position, index) => (
+                  <div
+                    className="layout-card"
+                    key={position.label}
+                    style={{
+                      left: `${position.x}%`,
+                      top: `${position.y}%`,
+                      transform: `translate(-50%, -50%) rotate(${position.rot ?? 0}deg) scale(${
+                        spread.count >= 10 ? 0.56 : spread.count >= 6 ? 0.78 : spread.count >= 5 ? 0.88 : 1
+                      })`,
+                    }}
+                  >
+                    <span className="serif">{index + 1}</span>
+                    <em>{position.label}</em>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section>
+              <h1 className="serif detail-title">{spread.name}</h1>
+              <p style={{ color: "var(--muted)", margin: "0 0 18px" }}>
+                {spread.count} {spread.count === 1 ? "card" : "cards"}
+              </p>
+              <p style={{ fontSize: 16, lineHeight: 1.6 }}>{spread.blurb}</p>
+              <p style={{ color: "var(--muted)", lineHeight: 1.5 }}>
+                <strong style={{ color: "var(--ink)" }}>Good for:</strong> {spread.good}
+              </p>
+              <div className="position-list">
+                {spread.positions.map((position, index) => (
+                  <div className="position-row" key={position.label}>
+                    <b>{index + 1}</b>
+                    <div>
+                      <strong>{position.label}</strong>
+                      <p style={{ margin: "3px 0 0", color: "var(--soft)", fontSize: 13 }}>
+                        {position.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                className="primary-btn"
+                style={{ width: "100%", borderRadius: 16 }}
+                onClick={() => setRoute("question")}
+              >
+                Ask your question
+              </button>
+              <p className="message">
+                {user?.subscribed
+                  ? "Unlimited readings are active on this account."
+                  : "Hold your question in mind as you draw."}
+              </p>
+            </section>
+          </div>
+        </main>
+      )}
+
+      {route === "question" && (
+        <main className="page">
+          <section className="reading-panel">
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "#1f1736",
+                color: "var(--gold)",
+                display: "grid",
+                placeItems: "center",
+                marginBottom: 18,
+                fontSize: 28,
+              }}
+            >
+              ◐
+            </div>
+            <h1 className="serif" style={{ margin: 0, fontSize: 42, fontWeight: 500 }}>
+              What&apos;s on your mind?
+            </h1>
+            <p className="message" style={{ marginBottom: 18 }}>
+              Your account keeps readings private, tracks free uses, and protects subscription
+              access on the server.
+            </p>
+            <textarea
+              className="textarea"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="Ask about love, work, timing, or the pattern you keep circling..."
+            />
+            <div className="prompt-row" style={{ marginTop: 14 }}>
+              {prompts.map((prompt) => (
+                <button className="prompt-chip" key={prompt} onClick={() => setQuestion(prompt)}>
+                  {prompt}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
+              <button className="primary-btn" onClick={() => void beginDraw()}>
+                Shuffle & draw
+              </button>
+              <button className="secondary-btn" onClick={() => setRoute("detail")}>
+                Cancel
+              </button>
+            </div>
+          </section>
+        </main>
+      )}
+
+      {route === "draw" && (
+        <main className="page">
+          <section className="stage starfield" style={{ padding: 28 }}>
+            <h1 className="serif" style={{ margin: 0, fontSize: 38, fontWeight: 500 }}>
+              {drawPhase === "shuffling"
+                ? "Shuffling the deck..."
+                : cards.every((card) => card.flipped)
+                  ? "All cards revealed"
+                  : "Tap each card to reveal"}
+            </h1>
+            <div className="draw-board">
+              {drawPhase === "shuffling" && (
+                <div style={{ display: "grid", placeItems: "center", height: "100%" }}>
+                  <div style={{ width: 96, height: 154, animation: "tarot-float 1.2s ease-in-out infinite" }}>
+                    <CardBack />
+                  </div>
+                </div>
+              )}
+              {drawPhase === "dealt" &&
+                cards.map((card, index) => (
+                  <div
+                    className="draw-slot"
+                    key={card.key}
+                    style={{
+                      left: `${card.x}%`,
+                      top: `${card.y}%`,
+                      transform: `translate(-50%, -50%) rotate(${card.rot ?? 0}deg) scale(${
+                        spread.scale ?? 1
+                      })`,
+                    }}
+                  >
+                    <button
+                      className={`draw-card ${card.flipped ? "flipped" : ""}`}
+                      onClick={() =>
+                        setCards((current) =>
+                          current.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, flipped: true } : item
+                          )
+                        )
+                      }
+                    >
+                      <span className="draw-inner">
+                        <span className="draw-face">
+                          <CardBack />
+                        </span>
+                        <span className="draw-face draw-front">
+                          <TarotImage card={card} reversed={card.reversed} />
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                ))}
+            </div>
+            {drawPhase === "dealt" && (
+              <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+                {!cards.every((card) => card.flipped) && (
+                  <button
+                    className="secondary-btn"
+                    onClick={() =>
+                      setCards((current) => current.map((card) => ({ ...card, flipped: true })))
+                    }
+                  >
+                    Reveal all
+                  </button>
+                )}
+                {cards.every((card) => card.flipped) && (
+                  <button className="white-btn" onClick={() => setRoute("result")}>
+                    Reveal my reading
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        </main>
+      )}
+
+      {route === "result" && (
+        <main className="page">
+          <button className="text-btn" onClick={goHome}>
+            ‹ New reading
+          </button>
+          <section className="result-panel" style={{ marginTop: 20 }}>
+            <h1 className="serif" style={{ margin: 0, fontSize: 38, fontWeight: 500 }}>
+              {spread.name}
+            </h1>
+            <p className="serif" style={{ color: "#3b2a6c", fontSize: 24, marginTop: 8 }}>
+              {question.trim() ? `“${question.trim()}”` : "General reading"}
+            </p>
+            <div className="result-list">
+              {cards.map((card) => {
+                const keywords = card.reversed ? card.rev : card.up;
+                return (
+                  <article className="result-card" key={card.key}>
+                    <div style={{ width: 74, height: 118 }}>
+                      <TarotImage card={card} reversed={card.reversed} />
+                    </div>
+                    <div>
+                      <span className="tag">{card.posLabel}</span>
+                      <h3 style={{ margin: "8px 0 4px" }}>{card.name}</h3>
+                      <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.5 }}>
+                        {card.reversed ? "Reversed" : "Upright"}: {keywords[0]}, {keywords[1]}.
+                        In this position, it points toward {keywords[2]}.
+                      </p>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="synthesis">
+              <span className="tag">THE READING</span>
+              <p className="serif" style={{ margin: "12px 0 0", fontSize: 22, lineHeight: 1.45 }}>
+                {synthesis}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
+              <button className="primary-btn" disabled={saving} onClick={() => void saveReading()}>
+                {saving ? "Saving..." : "Save to journal"}
+              </button>
+              <button className="secondary-btn" onClick={goHome}>
+                New reading
+              </button>
+            </div>
+          </section>
+        </main>
+      )}
+
+      {route === "history" && (
+        <main className="page">
+          <div className="section-head">
+            <h2>Your readings</h2>
+            <span>{user ? user.email : "Sign in to view your journal"}</span>
+          </div>
+          {!user && (
+            <section className="auth-panel">
+              <h2 className="serif" style={{ fontSize: 34, margin: 0 }}>
+                Your journal is private
+              </h2>
+              <p className="message">Sign in to sync readings and subscription access.</p>
+              <button className="primary-btn" onClick={() => setAuthOpen(true)}>
+                Sign in
+              </button>
+            </section>
+          )}
+          {user && history.length === 0 && (
+            <section className="auth-panel">
+              <h2 className="serif" style={{ fontSize: 34, margin: 0 }}>
+                No saved readings yet
+              </h2>
+              <p className="message">Browse spreads and save a result to see it here.</p>
+              <button className="primary-btn" onClick={goHome}>
+                Browse spreads
+              </button>
+            </section>
+          )}
+          {user && history.length > 0 && (
+            <div style={{ display: "grid", gap: 14 }}>
+              {history.map((reading) => (
+                <button
+                  className="spread-card"
+                  key={reading.id}
+                  onClick={() => openSaved(reading)}
+                  style={{ padding: 18 }}
+                >
+                  <h3 style={{ margin: "0 0 4px" }}>{reading.spreadName}</h3>
+                  <p style={{ margin: 0, color: "var(--muted)" }}>
+                    {new Date(reading.createdAt).toLocaleDateString()} ·{" "}
+                    {reading.payload.cards.map((card) => card.name).join(" · ")}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </main>
+      )}
+
+      {route === "about" && <AboutPage onBack={goHome} onBegin={beginAtSpreads} />}
+
+      {route === "privacy" && <PrivacyPage onBack={goHome} />}
+
+      {route === "contact" && <ContactPage onBack={goHome} />}
+
+      {authOpen && (
+        <div className="modal-backdrop">
+          <section className="modal">
+            <div className="modal-head starfield">
+              <button className="text-btn" style={{ color: "#fff", float: "right" }} onClick={() => setAuthOpen(false)}>
+                ✕
+              </button>
+              <div className="eyebrow">SECURE LOGIN</div>
+              <h2 className="serif" style={{ margin: 0, fontSize: 34, fontWeight: 500 }}>
+                Sign in to Arcana AI
+              </h2>
+            </div>
+            <div className="modal-body">
+              <label style={{ display: "grid", gap: 8, fontSize: 13, fontWeight: 700 }}>
+                Email
+                <input
+                  className="field"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="you@example.com"
+                />
+              </label>
+              {codeSent && (
+                <label style={{ display: "grid", gap: 8, marginTop: 14, fontSize: 13, fontWeight: 700 }}>
+                  Login code
+                  <input
+                    className="field"
+                    value={authCode}
+                    onChange={(event) => setAuthCode(event.target.value)}
+                    placeholder="000000"
+                    inputMode="numeric"
+                  />
+                </label>
+              )}
+              {devCode && <p className="message">Dev code: {devCode}</p>}
+              {authMessage && (
+                <p className={`message ${authMessage.includes("Could") || authMessage.includes("Incorrect") ? "error" : ""}`}>
+                  {authMessage}
+                </p>
+              )}
+              <button
+                className="primary-btn"
+                style={{ width: "100%", marginTop: 18, borderRadius: 14 }}
+                onClick={() => (codeSent ? void verifyCode() : void requestCode())}
+              >
+                {codeSent ? "Verify code" : "Send login code"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showPaywall && (
+        <div className="modal-backdrop">
+          <section className="modal">
+            <div className="modal-head starfield">
+              <button className="text-btn" style={{ color: "#fff", float: "right" }} onClick={() => setShowPaywall(false)}>
+                ✕
+              </button>
+              <div className="eyebrow">ARCANA PRO</div>
+              <h2 className="serif" style={{ margin: 0, fontSize: 34, fontWeight: 500 }}>
+                Unlimited readings await
+              </h2>
+              <p style={{ color: "rgba(255,255,255,.72)", marginBottom: 0 }}>
+                Unlock every spread with a PayPal subscription.
+              </p>
+            </div>
+            <div className="modal-body">
+              {!user && (
+                <>
+                  <p className="message" style={{ marginTop: 0 }}>
+                    Sign in first so your subscription is linked to the right account.
+                  </p>
+                  <button className="primary-btn" onClick={() => setAuthOpen(true)}>
+                    Sign in
+                  </button>
+                </>
+              )}
+              {user && (
+                <>
+                  <button
+                    className={`plan-row ${selectedPlan === "year" ? "selected" : ""}`}
+                    onClick={() => setSelectedPlan("year")}
+                  >
+                    <span>
+                      <strong>Annual Pass</strong>
+                      <br />
+                      <small>$19.99 · 365 days · unlimited readings</small>
+                    </span>
+                    <span className="tag">BEST VALUE</span>
+                  </button>
+                  <button
+                    className={`plan-row ${selectedPlan === "quarter" ? "selected" : ""}`}
+                    onClick={() => setSelectedPlan("quarter")}
+                  >
+                    <span>
+                      <strong>Quarterly Pass</strong>
+                      <br />
+                      <small>$9.99 · 90 days · unlimited readings</small>
+                    </span>
+                    <span className="tag">FLEXIBLE</span>
+                  </button>
+                  {!paypalConfig?.enabled && (
+                    <p className="message error">
+                      PayPal sandbox settings are not configured yet. Add the client ID, secret,
+                      webhook ID, and both plan IDs to the runtime environment.
+                    </p>
+                  )}
+                  <div id="paypal-buttons" aria-label={`PayPal ${planName} checkout`} />
+                  {paypalMessage && <p className="message">{paypalMessage}</p>}
+                  <p className="message">Secure checkout · status confirmed server-side.</p>
+                </>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
