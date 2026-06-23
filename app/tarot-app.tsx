@@ -47,6 +47,13 @@ type DrawnCard = TarotCard & {
   x: number;
   y: number;
   rot?: number;
+  interpretation?: string;
+};
+
+type ReadingInterpretation = {
+  cards: { num: string; posLabel: string; reversed: boolean; text: string }[];
+  synthesis: string;
+  model: string;
 };
 
 type SavedReading = {
@@ -61,43 +68,11 @@ type SavedReading = {
   };
 };
 
-type PayPalConfig = {
-  env: "sandbox" | "live";
-  clientId: string;
+type StripeConfig = {
   enabled: boolean;
-  plans: Record<Plan, string>;
+  publishableKey: string;
+  prices: Record<Plan, string>;
 };
-
-type PayPalApproveData = {
-  subscriptionID?: string;
-  subscriptionId?: string;
-};
-
-type PayPalActions = {
-  subscription: {
-    create: (payload: { plan_id: string }) => Promise<string>;
-  };
-};
-
-type PayPalButtons = {
-  render: (selector: string) => Promise<void> | void;
-};
-
-declare global {
-  interface Window {
-    paypal?: {
-      Buttons: (options: {
-        style?: Record<string, string>;
-        createSubscription: (
-          data: unknown,
-          actions: PayPalActions
-        ) => Promise<string>;
-        onApprove: (data: PayPalApproveData) => void | Promise<void>;
-        onError: () => void;
-      }) => PayPalButtons;
-    };
-  }
-}
 
 const prompts = [
   "Where is this relationship heading?",
@@ -107,6 +82,7 @@ const prompts = [
 ];
 
 const googleResumeKey = "arcana.googleLoginResume";
+const checkoutResumeKey = "arcana.checkoutResume";
 
 const faqs = [
   {
@@ -127,7 +103,7 @@ const faqs = [
   },
   {
     q: "Is Arcana AI free to use?",
-    a: "You can begin with two free readings. After that, Arcana Pro unlocks unlimited readings through a PayPal subscription linked to your account.",
+    a: "You can begin with two free readings. After that, Arcana Pro unlocks unlimited readings through a Stripe subscription linked to your account.",
   },
 ];
 
@@ -551,7 +527,7 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
     },
     {
       title: "Payments",
-      copy: "PayPal processes payment details. Arcana AI stores only the PayPal subscription identifier, plan, status, and renewal timing needed to unlock Pro access.",
+      copy: "Stripe processes payment details. Arcana AI stores only the Stripe subscription identifier, plan, status, and renewal timing needed to unlock Pro access.",
     },
     {
       title: "Cookies",
@@ -559,7 +535,7 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
     },
     {
       title: "Questions about your data",
-      copy: "Reach us at privacy@arcana.ai for account, billing, or data questions. Replace this placeholder with your final policy before launch.",
+      copy: "Reach us at privacy@arcana.ai for account, billing, or data questions, including requests to export or delete your saved readings.",
     },
   ];
 
@@ -656,11 +632,14 @@ export default function TarotApp() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>("year");
   const [pendingDraw, setPendingDraw] = useState(false);
-  const [paypalConfig, setPaypalConfig] = useState<PayPalConfig | null>(null);
-  const [paypalMessage, setPaypalMessage] = useState("");
+  const [stripeConfig, setStripeConfig] = useState<StripeConfig | null>(null);
+  const [checkoutMessage, setCheckoutMessage] = useState("");
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [history, setHistory] = useState<SavedReading[]>([]);
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [aiSynthesis, setAiSynthesis] = useState("");
   const [openFaq, setOpenFaq] = useState(0);
   const beginDrawRef = useRef<() => Promise<void>>(async () => undefined);
 
@@ -715,12 +694,12 @@ export default function TarotApp() {
         user: User | null;
         freeLimit: number;
       }>,
-      fetch("/api/paypal/config").then((res) => res.json()) as Promise<PayPalConfig>,
+      fetch("/api/stripe/config").then((res) => res.json()) as Promise<StripeConfig>,
     ]).then(([me, config]) => {
       if (!active) return;
       setUser(me.user);
       setFreeLimit(me.freeLimit);
-      setPaypalConfig(config);
+      setStripeConfig(config);
     });
 
     return () => {
@@ -767,67 +746,119 @@ export default function TarotApp() {
     };
   }, [route, user]);
 
+  // Returning from Stripe Checkout: confirm the session so membership flips to
+  // Pro immediately (the webhook is the backstop), then resume a pending draw.
   useEffect(() => {
-    if (!showPaywall || !user || !paypalConfig?.clientId || !paypalConfig.enabled) return;
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    if (!checkout) return;
 
-    const scriptId = "paypal-sdk";
-    const renderButtons = () => {
-      const container = document.getElementById("paypal-buttons");
-      if (!container || !window.paypal) return;
-      container.innerHTML = "";
-      window.paypal
-        .Buttons({
-          style: {
-            layout: "vertical",
-            shape: "pill",
-            label: "subscribe",
-          },
-          createSubscription: async (_data, actions) =>
-            actions.subscription.create({
-              plan_id: paypalConfig.plans[selectedPlan],
-            }),
-          onApprove: async (data) => {
-            const subscriptionId = data.subscriptionID ?? data.subscriptionId ?? "";
-            setPaypalMessage("Confirming your PayPal subscription...");
-            const response = await fetch("/api/paypal/confirm-subscription", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ subscriptionId, plan: selectedPlan }),
-            });
-            if (!response.ok) {
-              setPaypalMessage("PayPal approved, but server confirmation failed.");
-              return;
-            }
-            await refreshMe();
-            setShowPaywall(false);
-            flash("Subscription linked. PayPal will keep membership status in sync.");
-            if (pendingDraw) {
-              setPendingDraw(false);
-              window.setTimeout(() => void beginDrawRef.current(), 250);
-            }
-          },
-          onError: () => {
-            setPaypalMessage("PayPal checkout could not be opened. Please try again.");
-          },
-        })
-        .render("#paypal-buttons");
+    const clearParams = () => {
+      params.delete("checkout");
+      params.delete("session_id");
+      const query = params.toString();
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`
+      );
     };
 
-    const existing = document.getElementById(scriptId) as HTMLScriptElement | null;
-    if (existing) {
-      if (window.paypal) renderButtons();
-      else existing.addEventListener("load", renderButtons, { once: true });
+    if (checkout === "cancel") {
+      clearParams();
+      window.sessionStorage.removeItem(checkoutResumeKey);
+      window.setTimeout(() => flash("Checkout canceled — you were not charged."), 0);
       return;
     }
 
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
-      paypalConfig.clientId
-    )}&vault=true&intent=subscription`;
-    script.onload = renderButtons;
-    document.body.appendChild(script);
-  }, [showPaywall, user, paypalConfig, selectedPlan, pendingDraw]);
+    if (checkout !== "success") return;
+    const sessionId = params.get("session_id") ?? "";
+    clearParams();
+
+    const resumeDraw = () => {
+      const raw = window.sessionStorage.getItem(checkoutResumeKey);
+      window.sessionStorage.removeItem(checkoutResumeKey);
+      if (!raw) return;
+      try {
+        const resume = JSON.parse(raw) as {
+          spreadId?: string;
+          question?: string;
+          pendingDraw?: boolean;
+        };
+        if (resume.spreadId) setSpreadId(resume.spreadId);
+        if (typeof resume.question === "string") setQuestion(resume.question);
+        if (resume.pendingDraw) window.setTimeout(() => void beginDrawRef.current(), 400);
+      } catch {
+        // ignore malformed resume payload
+      }
+    };
+
+    void (async () => {
+      flash("Confirming your subscription…");
+      try {
+        const response = await fetch("/api/stripe/confirm-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+        const data = (await response.json()) as {
+          ok?: boolean;
+          pending?: boolean;
+          error?: string;
+        };
+        await refreshMe();
+        setShowPaywall(false);
+        setPendingDraw(false);
+        if (!response.ok) {
+          flash(data.error || "We couldn't confirm this checkout. If you were charged, contact support.");
+          return;
+        }
+        if (data.ok) {
+          flash("You're Pro — unlimited readings unlocked.");
+          resumeDraw();
+        } else {
+          flash("Payment received — your membership will activate shortly.");
+        }
+      } catch {
+        flash("Payment received — your membership will activate shortly.");
+      }
+    })();
+  }, []);
+
+  async function startCheckout(plan: Plan) {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    if (!stripeConfig?.enabled || checkoutBusy) return;
+
+    setCheckoutBusy(true);
+    setCheckoutMessage("Redirecting to secure checkout…");
+    if (pendingDraw) {
+      window.sessionStorage.setItem(
+        checkoutResumeKey,
+        JSON.stringify({ pendingDraw: true, spreadId, question })
+      );
+    }
+
+    try {
+      const response = await fetch("/api/stripe/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !data.url) {
+        setCheckoutBusy(false);
+        setCheckoutMessage(data.error || "Could not start checkout. Please try again.");
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      setCheckoutBusy(false);
+      setCheckoutMessage("Could not start checkout. Please try again.");
+    }
+  }
 
   function openSpread(id: string) {
     setSpreadId(id);
@@ -870,7 +901,7 @@ export default function TarotApp() {
       return;
     }
 
-    await refreshMe();
+    setAiSynthesis("");
     setRoute("draw");
     setDrawPhase("shuffling");
     setCards([]);
@@ -879,6 +910,63 @@ export default function TarotApp() {
       setCards(drawCards(spread));
       setDrawPhase("dealt");
     }, 1200);
+  }
+
+  async function revealReading() {
+    if (revealing) return;
+    if (!cards.length) {
+      setRoute("result");
+      return;
+    }
+    setRevealing(true);
+    try {
+      const response = await fetch("/api/readings/interpret", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          spreadId: spread.id,
+          question,
+          cards: cards.map((card) => ({ num: card.num, reversed: card.reversed })),
+        }),
+      });
+
+      if (response.status === 401) {
+        setAuthOpen(true);
+        return;
+      }
+      if (response.status === 402) {
+        setShowPaywall(true);
+        return;
+      }
+
+      const data = (await response.json().catch(() => null)) as {
+        interpretation?: ReadingInterpretation;
+      } | null;
+      if (!response.ok || !data?.interpretation) {
+        flash("Could not generate the reading. Please try again.");
+        return;
+      }
+
+      const byNum = new Map<string, string>();
+      data.interpretation.cards.forEach((item, index) => {
+        byNum.set(`${item.num}:${index}`, item.text);
+      });
+      setCards((current) =>
+        current.map((card, index) => ({
+          ...card,
+          flipped: true,
+          interpretation: byNum.get(`${card.num}:${index}`) ?? card.interpretation,
+        }))
+      );
+      setAiSynthesis(data.interpretation.synthesis);
+      await refreshMe();
+      setRoute("result");
+      window.scrollTo({ top: 0 });
+    } catch {
+      flash("Could not generate the reading. Please try again.");
+    } finally {
+      setRevealing(false);
+    }
   }
 
   function startGoogleLogin() {
@@ -963,7 +1051,7 @@ export default function TarotApp() {
         spreadName: spread.name,
         question,
         cards,
-        synthesis,
+        synthesis: aiSynthesis || synthesis,
       }),
     });
     setSaving(false);
@@ -978,6 +1066,7 @@ export default function TarotApp() {
     setSpreadId(reading.spreadId);
     setQuestion(reading.question);
     setCards(reading.payload.cards.map((card) => ({ ...card, flipped: true })));
+    setAiSynthesis(reading.payload.synthesis || "");
     setRoute("result");
     window.scrollTo({ top: 0 });
   }
@@ -1395,8 +1484,12 @@ export default function TarotApp() {
                   </button>
                 )}
                 {cards.every((card) => card.flipped) && (
-                  <button className="white-btn" onClick={() => setRoute("result")}>
-                    Reveal my reading
+                  <button
+                    className="white-btn"
+                    disabled={revealing}
+                    onClick={() => void revealReading()}
+                  >
+                    {revealing ? "Reading the cards..." : "Reveal my reading"}
                   </button>
                 )}
               </div>
@@ -1427,10 +1520,15 @@ export default function TarotApp() {
                     </div>
                     <div>
                       <span className="tag">{card.posLabel}</span>
-                      <h3 style={{ margin: "8px 0 4px" }}>{card.name}</h3>
+                      <h3 style={{ margin: "8px 0 4px" }}>
+                        {card.name}{" "}
+                        <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 14 }}>
+                          · {card.reversed ? "Reversed" : "Upright"}
+                        </span>
+                      </h3>
                       <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.5 }}>
-                        {card.reversed ? "Reversed" : "Upright"}: {keywords[0]}, {keywords[1]}.
-                        In this position, it points toward {keywords[2]}.
+                        {card.interpretation ??
+                          `${keywords[0]}, ${keywords[1]}. In this position, it points toward ${keywords[2]}.`}
                       </p>
                     </div>
                   </article>
@@ -1440,7 +1538,7 @@ export default function TarotApp() {
             <div className="synthesis">
               <span className="tag">THE READING</span>
               <p className="serif" style={{ margin: "12px 0 0", fontSize: 22, lineHeight: 1.45 }}>
-                {synthesis}
+                {aiSynthesis || synthesis}
               </p>
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
@@ -1536,7 +1634,10 @@ export default function TarotApp() {
             <button
               className="google-close"
               aria-label="Close"
-              onClick={() => setAuthOpen(false)}
+              onClick={() => {
+                setAuthOpen(false);
+                setPendingDraw(false);
+              }}
             >
               ✕
             </button>
@@ -1600,7 +1701,16 @@ export default function TarotApp() {
         <div className="modal-backdrop">
           <section className="modal">
             <div className="modal-head starfield">
-              <button className="text-btn" style={{ color: "#fff", float: "right" }} onClick={() => setShowPaywall(false)}>
+              <button
+                className="text-btn"
+                style={{ color: "#fff", float: "right" }}
+                onClick={() => {
+                  setShowPaywall(false);
+                  setPendingDraw(false);
+                  setCheckoutMessage("");
+                  setCheckoutBusy(false);
+                }}
+              >
                 ✕
               </button>
               <div className="eyebrow">ARCANA PRO</div>
@@ -1608,7 +1718,7 @@ export default function TarotApp() {
                 Unlimited readings await
               </h2>
               <p style={{ color: "rgba(255,255,255,.72)", marginBottom: 0 }}>
-                Unlock every spread with a PayPal subscription.
+                Unlock every spread with a Stripe subscription.
               </p>
             </div>
             <div className="modal-body">
@@ -1626,7 +1736,10 @@ export default function TarotApp() {
                 <>
                   <button
                     className={`plan-row ${selectedPlan === "year" ? "selected" : ""}`}
-                    onClick={() => setSelectedPlan("year")}
+                    onClick={() => {
+                      setSelectedPlan("year");
+                      setCheckoutMessage("");
+                    }}
                   >
                     <span>
                       <strong>Annual Pass</strong>
@@ -1637,7 +1750,10 @@ export default function TarotApp() {
                   </button>
                   <button
                     className={`plan-row ${selectedPlan === "quarter" ? "selected" : ""}`}
-                    onClick={() => setSelectedPlan("quarter")}
+                    onClick={() => {
+                      setSelectedPlan("quarter");
+                      setCheckoutMessage("");
+                    }}
                   >
                     <span>
                       <strong>Quarterly Pass</strong>
@@ -1646,15 +1762,22 @@ export default function TarotApp() {
                     </span>
                     <span className="tag">FLEXIBLE</span>
                   </button>
-                  {!paypalConfig?.enabled && (
+                  {!stripeConfig?.enabled && (
                     <p className="message error">
-                      PayPal sandbox settings are not configured yet. Add the client ID, secret,
-                      webhook ID, and both plan IDs to the runtime environment.
+                      Stripe is not configured yet. Add the secret key, webhook secret, and both
+                      price IDs to the runtime environment.
                     </p>
                   )}
-                  <div id="paypal-buttons" aria-label={`PayPal ${planName} checkout`} />
-                  {paypalMessage && <p className="message">{paypalMessage}</p>}
-                  <p className="message">Secure checkout · status confirmed server-side.</p>
+                  <button
+                    className="primary-btn"
+                    disabled={!stripeConfig?.enabled || checkoutBusy}
+                    onClick={() => void startCheckout(selectedPlan)}
+                    aria-label={`Subscribe to the ${planName} with Stripe`}
+                  >
+                    {checkoutBusy ? "Redirecting…" : `Subscribe — ${planName}`}
+                  </button>
+                  {checkoutMessage && <p className="message">{checkoutMessage}</p>}
+                  <p className="message">Secure checkout by Stripe · status confirmed server-side.</p>
                 </>
               )}
             </div>

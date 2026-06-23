@@ -9,12 +9,13 @@ export type AppEnv = {
   LOGIN_EMAIL_FROM?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
-  PAYPAL_ENV?: "sandbox" | "live";
-  PAYPAL_CLIENT_ID?: string;
-  PAYPAL_CLIENT_SECRET?: string;
-  PAYPAL_WEBHOOK_ID?: string;
-  PAYPAL_PLAN_ID_YEAR?: string;
-  PAYPAL_PLAN_ID_QUARTER?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_PUBLISHABLE_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_ID_YEAR?: string;
+  STRIPE_PRICE_ID_QUARTER?: string;
+  ANTHROPIC_API_KEY?: string;
+  AI_MODEL?: string;
 };
 
 export function getAppEnv() {

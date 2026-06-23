@@ -9,8 +9,13 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
+    "deploy": "vinext deploy",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work --ignore-pattern outputs",
-    "db:generate": "drizzle-kit generate"
+    "test": "node --experimental-strip-types --test \"test/*.test.ts\"",
+    "db:generate": "drizzle-kit generate",
+    "db:create": "wrangler d1 create arcana-ai-tarot",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local --config wrangler.d1.json",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config wrangler.d1.json"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

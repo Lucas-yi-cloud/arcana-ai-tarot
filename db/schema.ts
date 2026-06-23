@@ -88,7 +88,8 @@ export const subscriptions = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    paypalSubscriptionId: text("paypal_subscription_id").notNull(),
+    stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+    stripeCustomerId: text("stripe_customer_id"),
     plan: text("plan").notNull(),
     status: text("status").notNull(),
     currentPeriodEnd: integer("current_period_end"),
@@ -96,14 +97,14 @@ export const subscriptions = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => ({
-    paypalIdx: uniqueIndex("subscriptions_paypal_idx").on(
-      table.paypalSubscriptionId
+    stripeIdx: uniqueIndex("subscriptions_stripe_idx").on(
+      table.stripeSubscriptionId
     ),
     userIdx: index("subscriptions_user_idx").on(table.userId),
   })
 );
 
-export const paypalWebhookEvents = sqliteTable("paypal_webhook_events", {
+export const stripeWebhookEvents = sqliteTable("stripe_webhook_events", {
   id: text("id").primaryKey(),
   eventType: text("event_type").notNull(),
   processedAt: integer("processed_at").notNull(),

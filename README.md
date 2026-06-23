@@ -1,15 +1,16 @@
 # Arcana AI Tarot
 
-Arcana AI is a full-stack AI tarot reading web app built from a high-fidelity design handoff. Users can choose a spread, ask a question, draw Rider-Waite Major Arcana cards, save readings to a private journal, and unlock unlimited readings through PayPal subscriptions.
+Arcana AI is a full-stack AI tarot reading web app built from a high-fidelity design handoff. Users can choose a spread, ask a question, draw Rider-Waite Major Arcana cards, save readings to a private journal, and unlock unlimited readings through Stripe subscriptions.
 
 ## Features
 
 - Fourteen tarot spreads, including Daily Draw, Celtic Cross, Relationship Mirror, and Year Ahead
 - Animated spread previews, draw stage, card flip interaction, and result view
+- Real server-side AI interpretation via Claude (per-card readings + synthesis), with a deterministic fallback when no API key is set
 - Google OAuth sign-in with email one-time-code fallback and HttpOnly session cookies
-- Server-side free-trial gating: 2 free readings before paywall
-- D1-backed users, sessions, readings, subscriptions, and PayPal webhook events
-- PayPal subscription integration scaffold for annual and quarterly plans
+- Server-side free-trial gating: 2 free readings before paywall, consumed only when a reading succeeds
+- D1-backed users, sessions, readings, subscriptions, and Stripe webhook events
+- Stripe Checkout subscription integration for annual and quarterly plans
 - About, Privacy, Contact, SEO content, FAQ, and footer routes
 
 ## Stack
@@ -18,8 +19,9 @@ Arcana AI is a full-stack AI tarot reading web app built from a high-fidelity de
 - React
 - Cloudflare Workers-compatible runtime
 - Cloudflare D1 with Drizzle
+- Anthropic Claude (server-side tarot interpretation)
 - Google OAuth / OpenID Connect
-- PayPal Subscriptions API
+- Stripe Checkout + Subscriptions API
 
 ## Local Development
 
@@ -36,14 +38,15 @@ Create `.dev.vars` locally from `.env.example` and fill development values. Do n
 AUTH_SECRET="replace-with-a-long-random-secret"
 AUTH_DEV_MODE="true"
 APP_BASE_URL="http://localhost:3000"
+ANTHROPIC_API_KEY=""
+AI_MODEL="claude-opus-4-8"
 GOOGLE_CLIENT_ID=""
 GOOGLE_CLIENT_SECRET=""
-PAYPAL_ENV="sandbox"
-PAYPAL_CLIENT_ID=""
-PAYPAL_CLIENT_SECRET=""
-PAYPAL_WEBHOOK_ID=""
-PAYPAL_PLAN_ID_YEAR=""
-PAYPAL_PLAN_ID_QUARTER=""
+STRIPE_SECRET_KEY=""
+STRIPE_PUBLISHABLE_KEY=""
+STRIPE_WEBHOOK_SECRET=""
+STRIPE_PRICE_ID_YEAR=""
+STRIPE_PRICE_ID_QUARTER=""
 ```
 
 ## Database
@@ -74,21 +77,52 @@ npm run lint
 npm run build
 ```
 
-## PayPal Setup
+## Stripe Setup
 
-Create a PayPal Sandbox app, product, and two subscription plans:
+In the Stripe Dashboard (Test mode first), create a product with two recurring
+prices:
 
-- Annual Pass: 365 days, `$19.99`
-- Quarterly Pass: 90 days, `$9.99`
+- Annual Pass: `$19.99` / year
+- Quarterly Pass: `$9.99` / every 3 months
 
-Then set the runtime environment variables listed in `.env.example`. Webhook handling is implemented at:
+Copy each price's `price_…` id into `STRIPE_PRICE_ID_YEAR` / `STRIPE_PRICE_ID_QUARTER`,
+and set `STRIPE_SECRET_KEY` (the publishable key is optional — hosted Checkout
+doesn't use it client-side). Add a webhook endpoint pointing at:
 
 ```text
-/api/paypal/webhook
+https://<your-domain>/api/stripe/webhook
 ```
 
-Use PayPal webhook signature verification in production with `PAYPAL_WEBHOOK_ID`.
+subscribing to `checkout.session.completed`, `customer.subscription.created`,
+`customer.subscription.updated`, and `customer.subscription.deleted`, then put
+its signing secret in
+`STRIPE_WEBHOOK_SECRET`. The webhook signature is verified (HMAC-SHA256 with a
+timestamp tolerance) on every request. Checkout runs in hosted subscription mode;
+the success return is confirmed server-side and the webhook keeps status in sync.
 
-## Notes
+Test with card `4242 4242 4242 4242`, any future expiry and CVC.
 
-The current interpretation text is deterministic client-side placeholder logic. Replace it with a server-side LLM call before production launch if live AI interpretation is required.
+## AI Interpretation
+
+Readings are generated server-side by Claude (`lib/ai.ts` → `/api/readings/interpret`).
+The endpoint rebuilds the draw from the canonical deck/spread (so card meanings
+can't be tampered with by the client), calls the Anthropic Messages API for a
+per-card reading plus a final synthesis, and consumes a free read only when
+generation succeeds.
+
+Set `ANTHROPIC_API_KEY` to enable it; optionally override `AI_MODEL` (default
+`claude-opus-4-8`). Without a key it falls back to deterministic Rider-Waite
+text, so the app still runs end-to-end with no secrets.
+
+## Testing
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+## Deployment
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full Cloudflare Workers + D1 guide:
+database creation, migrations, secrets, third-party setup, and `npm run deploy`.

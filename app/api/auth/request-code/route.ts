@@ -9,7 +9,10 @@ export async function POST(request: Request) {
     if (!isEmail(email)) return jsonError("Enter a valid email address");
 
     const code = loginCode();
-    await createLoginCode(request, email, code);
+    const created = await createLoginCode(request, email, code);
+    if (created.throttled) {
+      return jsonError("Please wait a moment before requesting another code", 429);
+    }
     const delivery = await sendLoginEmail(email, code);
 
     return Response.json({

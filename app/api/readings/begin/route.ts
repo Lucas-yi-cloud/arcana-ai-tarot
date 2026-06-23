@@ -1,21 +1,25 @@
-import { eq } from "drizzle-orm";
-import { getDb } from "@/db";
-import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { canUseFreeReading, FREE_READING_LIMIT } from "@/lib/readings";
 
+/**
+ * Eligibility check before a draw. Does NOT consume a free reading — the free
+ * read is spent in /api/readings/interpret, and only when the AI reading
+ * actually succeeds. This lets the client show the paywall before the shuffle
+ * animation without burning a free read on a draw that never produces a result.
+ */
 export async function POST(request: Request) {
   const { user, response } = await requireUser(request);
   if (!user) return response;
 
   if (user.subscribed) {
-    return Response.json({ ok: true, freeUsed: user.freeUsed, subscribed: true });
+    return Response.json({ ok: true, eligible: true, subscribed: true, freeUsed: user.freeUsed });
   }
 
   if (!canUseFreeReading(user.freeUsed)) {
     return Response.json(
       {
         error: "Free trial used",
+        eligible: false,
         freeUsed: user.freeUsed,
         freeLimit: FREE_READING_LIMIT,
       },
@@ -23,7 +27,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const freeUsed = user.freeUsed + 1;
-  await getDb().update(users).set({ freeUsed }).where(eq(users.id, user.id));
-  return Response.json({ ok: true, freeUsed, subscribed: false });
+  return Response.json({
+    ok: true,
+    eligible: true,
+    subscribed: false,
+    freeUsed: user.freeUsed,
+    freeLimit: FREE_READING_LIMIT,
+  });
 }

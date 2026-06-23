@@ -42,7 +42,8 @@ type UserIdentity = {
 };
 
 export function isActiveSubscription(status: string, currentPeriodEnd: number | null) {
-  if (status !== "ACTIVE") return false;
+  // Stripe subscription statuses that grant access (active or in trial).
+  if (status !== "active" && status !== "trialing") return false;
   return !currentPeriodEnd || currentPeriodEnd > Date.now();
 }
 
@@ -112,18 +113,29 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
 
   if (!user) return null;
 
-  const [sub] = await db
+  // A user can accrue several subscription rows over time (Stripe issues a new
+  // id on every re-subscribe, and only stripe_subscription_id is unique). Grant
+  // access if ANY row is currently active, and represent membership with the
+  // active row whose access reaches furthest into the future — never trust the
+  // single most-recently-updated row, which a stale event on an old/canceled
+  // subscription could otherwise flip.
+  const rows = await db
     .select()
     .from(subscriptions)
-    .where(eq(subscriptions.userId, user.id))
-    .orderBy(desc(subscriptions.updatedAt))
-    .limit(1);
+    .where(eq(subscriptions.userId, user.id));
 
-  const subscription = sub
+  const farthest = (value: number | null) => value ?? Number.MAX_SAFE_INTEGER;
+  const activeRows = rows
+    .filter((row) => isActiveSubscription(row.status, row.currentPeriodEnd))
+    .sort((a, b) => farthest(b.currentPeriodEnd) - farthest(a.currentPeriodEnd));
+  const latestRow = [...rows].sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+  const chosen = activeRows[0] ?? latestRow;
+
+  const subscription = chosen
     ? {
-        plan: sub.plan,
-        status: sub.status,
-        currentPeriodEnd: sub.currentPeriodEnd,
+        plan: chosen.plan,
+        status: chosen.status,
+        currentPeriodEnd: chosen.currentPeriodEnd,
       }
     : null;
 
@@ -134,9 +146,7 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
     avatarUrl: user.avatarUrl,
     freeUsed: user.freeUsed,
     subscription,
-    subscribed: subscription
-      ? isActiveSubscription(subscription.status, subscription.currentPeriodEnd)
-      : false,
+    subscribed: activeRows.length > 0,
     membership: membershipFor(subscription, user.freeUsed),
   };
 }
@@ -153,10 +163,32 @@ export async function requireUser(request: Request) {
   return { user, response: null } as const;
 }
 
+export const LOGIN_CODE_COOLDOWN_MS = 60 * 1000;
+
 export async function createLoginCode(request: Request, email: string, code: string) {
   const secret = requireEnv("AUTH_SECRET");
   const db = getDb();
   const now = Date.now();
+
+  // Throttle: refuse a new code if an unused, unexpired one was issued for this
+  // email within the cooldown window. Prevents email/quota flooding.
+  const [recent] = await db
+    .select()
+    .from(loginCodes)
+    .where(
+      and(
+        eq(loginCodes.email, email),
+        isNull(loginCodes.usedAt),
+        gt(loginCodes.expiresAt, now)
+      )
+    )
+    .orderBy(desc(loginCodes.createdAt))
+    .limit(1);
+
+  if (recent && now - recent.createdAt < LOGIN_CODE_COOLDOWN_MS) {
+    return { throttled: true as const };
+  }
+
   const row = {
     id: randomId("lc_"),
     email,
@@ -169,7 +201,7 @@ export async function createLoginCode(request: Request, email: string, code: str
   };
 
   await db.insert(loginCodes).values(row);
-  return row;
+  return { throttled: false as const, row };
 }
 
 export async function findOrCreateUser(identity: UserIdentity) {
