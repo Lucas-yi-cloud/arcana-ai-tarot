@@ -27,6 +27,11 @@ type GoogleProfile = {
   picture?: string;
 };
 
+type VerifiedGoogleProfile = GoogleProfile & {
+  sub: string;
+  email: string;
+};
+
 const encoder = new TextEncoder();
 
 function baseUrl(request: Request) {
@@ -125,7 +130,9 @@ async function exchangeCode(request: Request, code: string, verifier: string) {
   return payload.access_token;
 }
 
-async function fetchGoogleProfile(accessToken: string) {
+async function fetchGoogleProfile(
+  accessToken: string
+): Promise<VerifiedGoogleProfile> {
   const response = await fetch(GOOGLE_USERINFO_URL, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -136,7 +143,7 @@ async function fetchGoogleProfile(accessToken: string) {
     throw new Error("Google email is not verified");
   }
 
-  return profile;
+  return profile as VerifiedGoogleProfile;
 }
 
 export async function startGoogleSignIn(request: Request) {

@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
+    "build:cloudrun": "CLOUD_RUN_BUILD=1 next build --webpack",
     "start": "vinext start",
+    "start:cloudrun": "next start -p ${PORT:-8080}",
     "deploy": "vinext deploy",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern work --ignore-pattern outputs",
     "test": "node --experimental-strip-types --test \"test/*.test.ts\"",

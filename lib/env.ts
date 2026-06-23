@@ -22,11 +22,11 @@ export function getAppEnv() {
   return env as unknown as AppEnv;
 }
 
-export function requireEnv(name: keyof AppEnv) {
+export function requireEnv<K extends keyof AppEnv>(name: K): NonNullable<AppEnv[K]> {
   const value = getAppEnv()[name];
   if (!value) {
     throw new Error(`${name} is not configured`);
   }
 
-  return value;
+  return value as NonNullable<AppEnv[K]>;
 }
