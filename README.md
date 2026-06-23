@@ -6,7 +6,7 @@ Arcana AI is a full-stack AI tarot reading web app built from a high-fidelity de
 
 - Fourteen tarot spreads, including Daily Draw, Celtic Cross, Relationship Mirror, and Year Ahead
 - Animated spread previews, draw stage, card flip interaction, and result view
-- Email one-time-code login with HttpOnly session cookies
+- Google OAuth sign-in with email one-time-code fallback and HttpOnly session cookies
 - Server-side free-trial gating: 2 free readings before paywall
 - D1-backed users, sessions, readings, subscriptions, and PayPal webhook events
 - PayPal subscription integration scaffold for annual and quarterly plans
@@ -18,6 +18,7 @@ Arcana AI is a full-stack AI tarot reading web app built from a high-fidelity de
 - React
 - Cloudflare Workers-compatible runtime
 - Cloudflare D1 with Drizzle
+- Google OAuth / OpenID Connect
 - PayPal Subscriptions API
 
 ## Local Development
@@ -34,6 +35,9 @@ Create `.dev.vars` locally from `.env.example` and fill development values. Do n
 ```env
 AUTH_SECRET="replace-with-a-long-random-secret"
 AUTH_DEV_MODE="true"
+APP_BASE_URL="http://localhost:3000"
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
 PAYPAL_ENV="sandbox"
 PAYPAL_CLIENT_ID=""
 PAYPAL_CLIENT_SECRET=""
@@ -51,6 +55,17 @@ npm run db:generate
 ```
 
 The initial migration is committed in `drizzle/`.
+
+## Google Login Setup
+
+Create an OAuth client in Google Cloud Console and set these authorized redirect URIs:
+
+```text
+http://localhost:3000/api/auth/google/callback
+https://your-production-domain.com/api/auth/google/callback
+```
+
+Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `APP_BASE_URL` in the runtime environment. Google sign-in stores the verified email, Google subject id, optional display name/avatar, and then uses Arcana AI's own secure session cookie.
 
 ## Verification
 

@@ -21,6 +21,8 @@ type Plan = "year" | "quarter";
 type User = {
   id: string;
   email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
   freeUsed: number;
   subscribed: boolean;
   subscription: {
@@ -28,6 +30,12 @@ type User = {
     status: string;
     currentPeriodEnd: number | null;
   } | null;
+  membership: {
+    tier: "free" | "quarter" | "year";
+    label: string;
+    detail: string;
+    currentPeriodEnd: number | null;
+  };
 };
 
 type DrawnCard = TarotCard & {
@@ -98,6 +106,8 @@ const prompts = [
   "Is this the right move for my career?",
 ];
 
+const googleResumeKey = "arcana.googleLoginResume";
+
 const faqs = [
   {
     q: "How does Arcana AI's tarot AI actually work?",
@@ -138,6 +148,49 @@ function LogoMark() {
       />
     </svg>
   );
+}
+
+function GoogleLogo({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"
+      />
+      <path
+        fill="#EA4335"
+        d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"
+      />
+    </svg>
+  );
+}
+
+function accountName(user: User) {
+  return user.displayName || user.email.split("@")[0] || "Arcana reader";
+}
+
+function accountInitial(user: User) {
+  return accountName(user).slice(0, 1).toUpperCase();
+}
+
+function membershipDaysLeft(user: User) {
+  const end = user.membership.currentPeriodEnd;
+  if (!end) return null;
+  return Math.max(0, Math.ceil((end - Date.now()) / 86_400_000));
+}
+
+function membershipCaption(user: User, freeLimit: number) {
+  if (user.membership.tier === "year") return "Annual pass · unlimited readings";
+  if (user.membership.tier === "quarter") return "Quarterly pass · unlimited readings";
+  return `${Math.max(0, freeLimit - user.freeUsed)} of ${freeLimit} free readings left`;
 }
 
 function CardBack() {
@@ -490,7 +543,7 @@ function PrivacyPage({ onBack }: { onBack: () => void }) {
   const sections = [
     {
       title: "Account and login",
-      copy: "Arcana AI uses email one-time codes for login. We store your email, a hashed session token, and basic timestamps so you can safely return to your journal.",
+      copy: "Arcana AI supports Google sign-in and email one-time codes. We store your email, optional Google profile details, a hashed session token, and basic timestamps so you can safely return to your journal.",
     },
     {
       title: "Your questions and readings",
@@ -599,6 +652,7 @@ export default function TarotApp() {
   const [codeSent, setCodeSent] = useState(false);
   const [devCode, setDevCode] = useState("");
   const [authMessage, setAuthMessage] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>("year");
   const [pendingDraw, setPendingDraw] = useState(false);
@@ -629,6 +683,32 @@ export default function TarotApp() {
   }
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const loginStatus = params.get("login");
+    if (!loginStatus) return;
+
+    window.setTimeout(() => {
+      if (loginStatus === "google-ok") {
+        flash("Signed in with Google.");
+      } else if (loginStatus === "google-config") {
+        setAuthOpen(true);
+        setAuthMessage("Google sign-in is not configured yet.");
+      } else if (loginStatus === "google-error") {
+        setAuthOpen(true);
+        setAuthMessage("Google sign-in could not be completed. Please try again.");
+      }
+    }, 0);
+
+    params.delete("login");
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`
+    );
+  }, []);
+
+  useEffect(() => {
     let active = true;
     void Promise.all([
       fetch("/api/me").then((res) => res.json()) as Promise<{
@@ -647,6 +727,31 @@ export default function TarotApp() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const rawResume = window.sessionStorage.getItem(googleResumeKey);
+    if (!rawResume) return;
+    window.sessionStorage.removeItem(googleResumeKey);
+
+    try {
+      const resume = JSON.parse(rawResume) as {
+        pendingDraw?: boolean;
+        spreadId?: string;
+        question?: string;
+      };
+      window.setTimeout(() => {
+        if (resume.spreadId) setSpreadId(resume.spreadId);
+        if (typeof resume.question === "string") setQuestion(resume.question);
+        if (resume.pendingDraw) {
+          setPendingDraw(false);
+          window.setTimeout(() => void beginDrawRef.current(), 350);
+        }
+      }, 0);
+    } catch {
+      window.sessionStorage.removeItem(googleResumeKey);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (route !== "history" || !user) return;
@@ -776,6 +881,21 @@ export default function TarotApp() {
     }, 1200);
   }
 
+  function startGoogleLogin() {
+    setAuthMessage("Opening Google sign-in...");
+    if (pendingDraw || route === "question") {
+      window.sessionStorage.setItem(
+        googleResumeKey,
+        JSON.stringify({
+          pendingDraw,
+          spreadId,
+          question,
+        })
+      );
+    }
+    window.location.href = "/api/auth/google/start?redirect=/";
+  }
+
   useEffect(() => {
     beginDrawRef.current = beginDraw;
   });
@@ -825,6 +945,7 @@ export default function TarotApp() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     setHistory([]);
+    setProfileOpen(false);
     flash("Signed out.");
   }
 
@@ -862,6 +983,7 @@ export default function TarotApp() {
   }
 
   const planName = selectedPlan === "year" ? "Annual Pass" : "Quarterly Pass";
+  const activeDays = user ? membershipDaysLeft(user) : null;
 
   return (
     <div className="app-shell">
@@ -887,12 +1009,12 @@ export default function TarotApp() {
             Journals
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="account-actions">
           {user?.subscribed ? (
             <div className="pro-pill">
               <span style={{ color: "var(--gold-bright)" }}>PRO</span>
               <span style={{ color: "rgba(255,255,255,.62)", fontWeight: 600 }}>
-                Active
+                {activeDays !== null ? `${activeDays}d left` : "Active"}
               </span>
             </div>
           ) : (
@@ -901,9 +1023,80 @@ export default function TarotApp() {
               <span>Go Unlimited</span>
             </button>
           )}
-          <button className="avatar" onClick={() => (user ? void logout() : setAuthOpen(true))}>
-            {user ? user.email.slice(0, 1).toUpperCase() : "M"}
-          </button>
+          {!user && (
+            <button
+              className="nav-signin"
+              aria-label="Sign in with Google"
+              onClick={() => setAuthOpen(true)}
+            >
+              <GoogleLogo size={16} />
+              <span>Sign in</span>
+            </button>
+          )}
+          {user && (
+            <div className="profile-wrap">
+              <button
+                className="avatar"
+                onClick={() => setProfileOpen((open) => !open)}
+                aria-label="Account"
+              >
+                {user.avatarUrl ? (
+                  <img alt="" src={user.avatarUrl} />
+                ) : (
+                  accountInitial(user)
+                )}
+              </button>
+              {profileOpen && (
+                <div className="profile-menu">
+                  <div className="profile-head">
+                    <div className="avatar large">
+                      {user.avatarUrl ? (
+                        <img alt="" src={user.avatarUrl} />
+                      ) : (
+                        accountInitial(user)
+                      )}
+                    </div>
+                    <div>
+                      <strong>{accountName(user)}</strong>
+                      <span>{user.email}</span>
+                    </div>
+                  </div>
+                  <div className="profile-status">
+                    <span className={`status-pill ${user.membership.tier}`}>
+                      {user.membership.tier === "free" ? "FREE" : "PRO"}
+                    </span>
+                    <div>
+                      <strong>{user.membership.label}</strong>
+                      <span>{membershipCaption(user, freeLimit)}</span>
+                    </div>
+                    {!user.subscribed && (
+                      <button
+                        className="mini-upgrade"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          setShowPaywall(true);
+                        }}
+                      >
+                        Upgrade
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    className="profile-action"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setRoute("history");
+                    }}
+                  >
+                    Your readings
+                  </button>
+                  <button className="profile-action" onClick={() => void logout()}>
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </nav>
 
@@ -972,9 +1165,7 @@ export default function TarotApp() {
           <div className="section-head" id="spreads">
             <h2>Choose your spread</h2>
             <span>
-              {user?.subscribed
-                ? "Unlimited readings active"
-                : `${Math.max(0, freeLimit - (user?.freeUsed ?? 0))} free readings left`}
+              {user ? membershipCaption(user, freeLimit) : "Choose a spread to begin your reading"}
             </span>
           </div>
           <div className="spread-grid">
@@ -1268,8 +1459,28 @@ export default function TarotApp() {
         <main className="page">
           <div className="section-head">
             <h2>Your readings</h2>
-            <span>{user ? user.email : "Sign in to view your journal"}</span>
+            <span>
+              {user
+                ? `${user.membership.label} · ${accountName(user)}`
+                : "Sign in to view your journal"}
+            </span>
           </div>
+          {user && (
+            <section className="account-summary">
+              <div>
+                <span className={`status-pill ${user.membership.tier}`}>
+                  {user.membership.tier === "free" ? "FREE" : "PRO"}
+                </span>
+                <h3>{user.membership.label}</h3>
+                <p>{membershipCaption(user, freeLimit)}</p>
+              </div>
+              {!user.subscribed && (
+                <button className="primary-btn" onClick={() => setShowPaywall(true)}>
+                  Upgrade
+                </button>
+              )}
+            </section>
+          )}
           {!user && (
             <section className="auth-panel">
               <h2 className="serif" style={{ fontSize: 34, margin: 0 }}>
@@ -1321,17 +1532,31 @@ export default function TarotApp() {
 
       {authOpen && (
         <div className="modal-backdrop">
-          <section className="modal">
-            <div className="modal-head starfield">
-              <button className="text-btn" style={{ color: "#fff", float: "right" }} onClick={() => setAuthOpen(false)}>
-                ✕
+          <section className="google-login-card" aria-modal="true" role="dialog">
+            <button
+              className="google-close"
+              aria-label="Close"
+              onClick={() => setAuthOpen(false)}
+            >
+              ✕
+            </button>
+            <div className="google-login-main">
+              <GoogleLogo size={40} />
+              <h2>Sign in</h2>
+              <p>
+                to continue to <strong>Arcana AI</strong>
+              </p>
+              <button className="google-login-btn" onClick={startGoogleLogin}>
+                <GoogleLogo size={18} />
+                <span>Continue with Google</span>
               </button>
-              <div className="eyebrow">SECURE LOGIN</div>
-              <h2 className="serif" style={{ margin: 0, fontSize: 34, fontWeight: 500 }}>
-                Sign in to Arcana AI
-              </h2>
-            </div>
-            <div className="modal-body">
+              <p className="google-consent">
+                Google will share your name, email address, and profile picture
+                with Arcana AI.
+              </p>
+              <div className="auth-divider">
+                <span>or use email code</span>
+              </div>
               <label style={{ display: "grid", gap: 8, fontSize: 13, fontWeight: 700 }}>
                 Email
                 <input
@@ -1355,7 +1580,7 @@ export default function TarotApp() {
               )}
               {devCode && <p className="message">Dev code: {devCode}</p>}
               {authMessage && (
-                <p className={`message ${authMessage.includes("Could") || authMessage.includes("Incorrect") ? "error" : ""}`}>
+                <p className={`message ${/could|incorrect|expired|too many|not configured/i.test(authMessage) ? "error" : ""}`}>
                   {authMessage}
                 </p>
               )}

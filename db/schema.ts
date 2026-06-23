@@ -5,12 +5,17 @@ export const users = sqliteTable(
   {
     id: text("id").primaryKey(),
     email: text("email").notNull(),
+    displayName: text("display_name"),
+    avatarUrl: text("avatar_url"),
+    googleSub: text("google_sub"),
+    authProvider: text("auth_provider").notNull().default("email"),
     freeUsed: integer("free_used").notNull().default(0),
     createdAt: integer("created_at").notNull(),
     lastLoginAt: integer("last_login_at"),
   },
   (table) => ({
     emailIdx: uniqueIndex("users_email_idx").on(table.email),
+    googleSubIdx: uniqueIndex("users_google_sub_idx").on(table.googleSub),
   })
 );
 
@@ -29,6 +34,28 @@ export const loginCodes = sqliteTable(
   (table) => ({
     emailCreatedIdx: index("login_codes_email_created_idx").on(
       table.email,
+      table.createdAt
+    ),
+  })
+);
+
+export const oauthStates = sqliteTable(
+  "oauth_states",
+  {
+    id: text("id").primaryKey(),
+    provider: text("provider").notNull(),
+    stateHash: text("state_hash").notNull(),
+    verifierHash: text("verifier_hash").notNull(),
+    redirectPath: text("redirect_path").notNull().default("/"),
+    expiresAt: integer("expires_at").notNull(),
+    createdAt: integer("created_at").notNull(),
+    usedAt: integer("used_at"),
+    ipHash: text("ip_hash"),
+  },
+  (table) => ({
+    stateIdx: uniqueIndex("oauth_states_state_idx").on(table.stateHash),
+    providerCreatedIdx: index("oauth_states_provider_created_idx").on(
+      table.provider,
       table.createdAt
     ),
   })

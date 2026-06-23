@@ -2,6 +2,7 @@ import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { loginCodes, sessions, subscriptions, users } from "@/db/schema";
 import { getAppEnv, requireEnv } from "@/lib/env";
+import { FREE_READING_LIMIT } from "@/lib/readings";
 import {
   codeHash,
   ipHash,
@@ -15,6 +16,8 @@ import {
 export type CurrentUser = {
   id: string;
   email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
   freeUsed: number;
   subscription: {
     plan: string;
@@ -22,11 +25,59 @@ export type CurrentUser = {
     currentPeriodEnd: number | null;
   } | null;
   subscribed: boolean;
+  membership: {
+    tier: "free" | "quarter" | "year";
+    label: string;
+    detail: string;
+    currentPeriodEnd: number | null;
+  };
+};
+
+type UserIdentity = {
+  email: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  googleSub?: string | null;
+  authProvider?: "email" | "google";
 };
 
 export function isActiveSubscription(status: string, currentPeriodEnd: number | null) {
   if (status !== "ACTIVE") return false;
   return !currentPeriodEnd || currentPeriodEnd > Date.now();
+}
+
+function membershipFor(
+  subscription: CurrentUser["subscription"],
+  freeUsed: number
+): CurrentUser["membership"] {
+  const active = subscription
+    ? isActiveSubscription(subscription.status, subscription.currentPeriodEnd)
+    : false;
+
+  if (active && subscription?.plan === "quarter") {
+    return {
+      tier: "quarter",
+      label: "Quarterly member",
+      detail: "90-day unlimited pass",
+      currentPeriodEnd: subscription.currentPeriodEnd,
+    };
+  }
+
+  if (active && subscription?.plan === "year") {
+    return {
+      tier: "year",
+      label: "Annual member",
+      detail: "365-day unlimited pass",
+      currentPeriodEnd: subscription.currentPeriodEnd,
+    };
+  }
+
+  return {
+    tier: "free",
+    label: "Free user",
+    detail: `${Math.max(0, FREE_READING_LIMIT - freeUsed)} free readings left`,
+    currentPeriodEnd: null,
+  };
 }
 
 export async function getCurrentUser(request: Request): Promise<CurrentUser | null> {
@@ -79,11 +130,14 @@ export async function getCurrentUser(request: Request): Promise<CurrentUser | nu
   return {
     id: user.id,
     email: user.email,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
     freeUsed: user.freeUsed,
     subscription,
     subscribed: subscription
       ? isActiveSubscription(subscription.status, subscription.currentPeriodEnd)
       : false,
+    membership: membershipFor(subscription, user.freeUsed),
   };
 }
 
@@ -118,6 +172,81 @@ export async function createLoginCode(request: Request, email: string, code: str
   return row;
 }
 
+export async function findOrCreateUser(identity: UserIdentity) {
+  const db = getDb();
+  const now = Date.now();
+  let [user] =
+    identity.googleSub
+      ? await db.select().from(users).where(eq(users.googleSub, identity.googleSub)).limit(1)
+      : [];
+
+  if (!user) {
+    [user] = await db.select().from(users).where(eq(users.email, identity.email)).limit(1);
+  }
+
+  if (!user) {
+    const id = randomId("usr_");
+    await db.insert(users).values({
+      id,
+      email: identity.email,
+      displayName: identity.displayName ?? null,
+      avatarUrl: identity.avatarUrl ?? null,
+      googleSub: identity.googleSub ?? null,
+      authProvider: identity.authProvider ?? "email",
+      freeUsed: 0,
+      createdAt: now,
+      lastLoginAt: now,
+    });
+    [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return user;
+  }
+
+  if (
+    identity.googleSub &&
+    user.googleSub &&
+    user.googleSub !== identity.googleSub
+  ) {
+    throw new Error("This email is already linked to another Google account");
+  }
+
+  await db
+    .update(users)
+    .set({
+      email: identity.email,
+      displayName: identity.displayName ?? user.displayName,
+      avatarUrl: identity.avatarUrl ?? user.avatarUrl,
+      googleSub: identity.googleSub ?? user.googleSub,
+      authProvider: identity.authProvider ?? user.authProvider,
+      lastLoginAt: now,
+    })
+    .where(eq(users.id, user.id));
+
+  [user] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+  return user;
+}
+
+export async function createUserSession(request: Request, userId: string) {
+  const secret = requireEnv("AUTH_SECRET");
+  const now = Date.now();
+  const sessionId = randomId("ses_");
+  const token = randomId("tok_");
+
+  await getDb()
+    .insert(sessions)
+    .values({
+      id: sessionId,
+      userId,
+      tokenHash: await tokenHash(token, secret),
+      createdAt: now,
+      expiresAt: now + SESSION_DAYS * 24 * 60 * 60 * 1000,
+      revokedAt: null,
+      userAgent: request.headers.get("user-agent"),
+      ipHash: await ipHash(request, secret),
+    });
+
+  return sessionCookie(sessionId, token, request);
+}
+
 export async function verifyLoginCode(request: Request, email: string, code: string) {
   const secret = requireEnv("AUTH_SECRET");
   const db = getDb();
@@ -149,38 +278,12 @@ export async function verifyLoginCode(request: Request, email: string, code: str
 
   await db.update(loginCodes).set({ usedAt: now }).where(eq(loginCodes.id, row.id));
 
-  let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  if (!user) {
-    const id = randomId("usr_");
-    await db.insert(users).values({
-      id,
-      email,
-      freeUsed: 0,
-      createdAt: now,
-      lastLoginAt: now,
-    });
-    [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
-  } else {
-    await db.update(users).set({ lastLoginAt: now }).where(eq(users.id, user.id));
-  }
-
-  const sessionId = randomId("ses_");
-  const token = randomId("tok_");
-  await db.insert(sessions).values({
-    id: sessionId,
-    userId: user.id,
-    tokenHash: await tokenHash(token, secret),
-    createdAt: now,
-    expiresAt: now + SESSION_DAYS * 24 * 60 * 60 * 1000,
-    revokedAt: null,
-    userAgent: request.headers.get("user-agent"),
-    ipHash: await ipHash(request, secret),
-  });
+  const user = await findOrCreateUser({ email, authProvider: "email" });
 
   return {
     ok: true as const,
     user,
-    cookie: sessionCookie(sessionId, token, request),
+    cookie: await createUserSession(request, user.id),
   };
 }
 

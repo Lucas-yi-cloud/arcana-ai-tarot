@@ -7,6 +7,8 @@ export type AppEnv = {
   APP_BASE_URL?: string;
   RESEND_API_KEY?: string;
   LOGIN_EMAIL_FROM?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   PAYPAL_ENV?: "sandbox" | "live";
   PAYPAL_CLIENT_ID?: string;
   PAYPAL_CLIENT_SECRET?: string;
