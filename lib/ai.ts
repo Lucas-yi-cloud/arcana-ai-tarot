@@ -262,10 +262,12 @@ async function callGemini(env: AppEnv, userPrompt: string): Promise<ProviderResu
   const model = env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
 
   const response = await fetch(
-    `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      // Pass the key in the x-goog-api-key header, not the URL query string, so it never lands in
+      // request logs / proxies — and it works for both AIza… and newer AQ.… key formats.
+      headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
