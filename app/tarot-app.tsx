@@ -273,24 +273,36 @@ const checkoutResumeKey = "arcana.checkoutResume";
 
 const faqs = [
   {
-    q: "How does Arcana AI's tarot AI actually work?",
-    a: "You pick a spread and ask a question, then shuffle and draw. Arcana AI looks at the specific cards you pulled, each card's position in the spread, and whether it landed upright or reversed, then writes an interpretation for every card and a final synthesis tying the whole reading to your question.",
+    q: "How does an AI tarot reading actually work?",
+    a: "You pick a spread, ask a question, then shuffle and draw the cards yourself. Arcana AI reads the specific cards you pulled — each card's named position in the spread and whether it landed upright or reversed — then writes an interpretation for every card plus a final synthesis that ties the whole spread back to your question.",
   },
   {
-    q: "Is an AI tarot reading accurate?",
-    a: "Tarot is best treated as a mirror for reflection, not a fixed prediction. Arcana AI stays accurate to the deck by applying traditional Rider-Waite meanings to your draw and using the symbolism to help you think about your situation more clearly.",
+    q: "Are AI tarot readings accurate?",
+    a: "Tarot was never fortune-telling — it's a mirror for reflection, and that's exactly what Arcana AI is accurate to. It applies the traditional Rider-Waite-Smith meanings faithfully to your draw, every time. The cards don't predict a fixed future; they help you see your situation more clearly so you can decide what to do with it.",
   },
   {
-    q: "Are these real tarot cards?",
-    a: "Yes. Arcana AI uses the Rider-Waite-Smith Major Arcana with upright and reversed meanings, plus spread positions that mirror how readers structure a real session.",
+    q: "Can AI really replace a human tarot reader? What does it lack?",
+    a: "It's a different thing, not a replacement. A human reader brings presence, intuition, and a relationship you can't automate. Arcana AI offers consistency, privacy, and availability with no judgement, which makes it useful for practice, reflection, and readings between human sessions.",
   },
   {
-    q: "Which tarot spread should I choose?",
-    a: "For a quick check-in, try Daily Draw or Yes / No. For a situation unfolding over time, choose Past · Present · Future. For love, work, decisions, or a full deep dive, choose the matching spread and read the position guide before you begin.",
+    q: "Are these real tarot cards, or AI-generated art?",
+    a: "Real cards. Arcana AI uses the Rider-Waite-Smith deck with the original 1909 Pamela Colman Smith artwork and the century-old meanings that go with it, reversals included. The deck is not AI-generated; only the interpretation is written for you.",
   },
   {
-    q: "Is Arcana AI free to use?",
-    a: "You can begin with two free readings. After that, Arcana Pro unlocks unlimited readings through a Stripe subscription linked to your account.",
+    q: "Do I need to know tarot before I start?",
+    a: "Not at all. Every spread tells you what it's good for before you begin, each position is named and explained as you draw, and the reading is written in plain language. If you already read tarot, it works as a fast second opinion to compare against your own interpretation.",
+  },
+  {
+    q: "What questions can I ask, and how do I ask better ones?",
+    a: "Open, reflective questions work best — 'what should I understand about...' or 'what's blocking me from...' — rather than yes/no fishing, though the Yes / No spread is there when you want a direct nudge. The more honest and specific your question, the more useful the reflection.",
+  },
+  {
+    q: "Can I ask the same question again, or follow up?",
+    a: "You can, but re-drawing the same question repeatedly tends to muddy the message rather than clarify it. When a reading raises something new, the most useful move is to ask a fresh, more specific follow-up question instead of re-rolling the same one.",
+  },
+  {
+    q: "Is Arcana AI free, and is my reading private?",
+    a: "You can begin with free readings to experience a full AI tarot reading end to end. Arcana Pro unlocks unlimited readings across every spread, and your account keeps saved readings private to you.",
   },
 ];
 
@@ -360,19 +372,16 @@ function syncDocumentMeta(spread: Spread | null) {
 
 function LogoMark() {
   return (
-    <svg viewBox="0 0 24 22" width="20" height="18" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
       <path
-        d="M17.9 8c-1.6 0-2.3 2.7-3 5.6-.2.8-.4 1.6-.6 2.2-.2.5-.4.8-.6.8s-.4-.3-.6-.8c-.2-.6-.4-1.4-.6-2.2-.1-.4-.2-.8-.3-1.2-.04-.16-.2-.27-.36-.26-.23.004-.4.22-.34.44.1.42.2.84.3 1.26.45 1.8.87 3.5 1.96 3.5s1.5-1.7 1.95-3.49c.33-1.3.66-2.65 1.07-3.63.4-.96.83-1.45 1.26-1.45s.86.49 1.26 1.45c.15.37.3.79.43 1.24.05.18.24.29.42.24.2-.05.3-.25.25-.44C19.5 9.6 18.8 8 17.65 8z"
-        fill="currentColor"
+        d="M14.4 3.2a9 9 0 1 0 4.3 12.2 7 7 0 0 1-4.3-12.2z"
+        fill="#ffe98a"
       />
       <path
-        d="M11.25 9.5c.07.22-.09.45-.32.46-.16.01-.31-.09-.36-.24C10.37 9.06 10.16 8.46 9.94 7.92 9.25 6.27 8.52 5.47 7.72 5.47S6.2 6.27 5.5 7.92C5 9.1 4.59 10.6 4.19 12.18c-.04.14.01.28.12.37.34.26.56.67.56 1.13a1.43 1.43 0 0 1-1.53 1.42 1.43 1.43 0 0 1-.18-2.84c.14-.02.26-.12.29-.26C4.5 8.1 5.59 4.75 7.72 4.75c1.66 0 2.69 2.01 3.53 4.74z"
+        d="M17.6 4.2l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z"
         fill="#fff"
       />
-      <path
-        d="M5.29 12.6c.1.16.3.22.47.14 1.57-.8 3.42-1.38 6.25-1.38.87 0 1.65.05 2.35.15.17.02.34-.09.39-.26.06-.2-.08-.42-.29-.45-.74-.1-1.55-.16-2.45-.16-2.96 0-4.93.63-6.57 1.46-.18.09-.25.32-.15.5z"
-        fill="#fff"
-      />
+      <circle cx="6.5" cy="17.5" r="0.9" fill="#fff" opacity="0.85" />
     </svg>
   );
 }
@@ -492,22 +501,25 @@ function SeoSection({
   onToggleFaq: (index: number) => void;
 }) {
   const stats = [
-    ["14", "tarot spreads"],
+    ["14", "traditional spreads"],
     ["22", "Major Arcana cards"],
     ["1909", "Rider-Waite tradition"],
-    ["100%", "private account history"],
+    ["100%", "private readings"],
   ];
   const pillars = [
     {
-      title: "Readings grounded in experience",
-      copy: "The flow mirrors a real tarot session: choose a spread, set an intention, draw, reveal, then read each card in context.",
+      title: "Grounded in experience",
+      copy: "Shuffle, draw, and flip each card yourself. Arcana AI reads what actually landed in front of you, so no two readings are alike.",
       icon: (
-        <path d="M16 4l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" />
+        <>
+          <path d="M3 16s5-8 13-8 13 8 13 8-5 8-13 8S3 16 3 16z" />
+          <circle cx="16" cy="16" r="3.4" />
+        </>
       ),
     },
     {
-      title: "Rooted in the Rider-Waite tradition",
-      copy: "Every card follows the symbolic language of the classic Rider-Waite-Smith deck, including upright and reversed meanings.",
+      title: "Rooted in tradition",
+      copy: "Every card is the classic 1909 Rider-Waite-Smith illustration, interpreted with established upright and reversed meanings.",
       icon: (
         <>
           <path d="M5 24l-2-13 7 6 6-10 6 10 7-6-2 13z" />
@@ -516,8 +528,8 @@ function SeoSection({
       ),
     },
     {
-      title: "Every spread, fully explained",
-      copy: "From a one-card Daily Draw to the Celtic Cross and Year Ahead, each position is named, explained, and woven into one synthesis.",
+      title: "Every spread explained",
+      copy: "From a one-card Daily Draw to the Celtic Cross, each position is named, explained, then woven into one clear synthesis.",
       icon: (
         <>
           <circle cx="16" cy="16" r="11" />
@@ -527,8 +539,8 @@ function SeoSection({
       ),
     },
     {
-      title: "Private and judgment-free",
-      copy: "Your account protects saved readings and subscription access, while the experience stays calm, reflective, and ad-free.",
+      title: "Private & judgment-free",
+      copy: "Your questions and saved readings stay in your own journal, linked to your account and available when you want to revisit them.",
       icon: (
         <>
           <path d="M16 4l11 4v8c0 7-5 11-11 12-6-1-11-5-11-12V8z" />
@@ -547,16 +559,48 @@ function SeoSection({
         </h2>
         <p>
           Arcana AI turns the centuries-old practice of tarot into a guided digital
-          ritual. Choose from fourteen spreads, hold your question, and draw from the
-          Rider-Waite Major Arcana. Every <strong>AI tarot reading</strong> interprets
-          the exact cards you drew, their position, their orientation, and the question
-          you asked.
+          ritual. Choose from fourteen traditional spreads, hold your question, and draw
+          from the complete Rider-Waite Major Arcana. Every <strong>AI tarot reading</strong>{" "}
+          interprets the exact cards you drew — their position, their orientation, and the
+          question you asked — into language you can actually act on.
         </p>
-        <p>
-          Where many <strong>tarot AI</strong> tools return generic blurbs, Arcana AI
-          reads the whole spread as one story: how the cards relate, what tension runs
-          between them, and where the reading points next.
-        </p>
+      </div>
+
+      <div className="seo-ritual-panel starfield">
+        <div className="seo-ritual-glow" aria-hidden="true" />
+        <div className="seo-ritual-stars" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="seo-ritual-cards" aria-hidden="true">
+          {[
+            ["18", "The Moon", "left"],
+            ["19", "The Sun", "right"],
+            ["17", "The Star", "center"],
+          ].map(([num, name, slot]) => (
+            <div className={`seo-ritual-card seo-ritual-card-${slot}`} key={name}>
+              <img alt={String(name)} src={cardImage(String(num), String(name))} loading="lazy" />
+              {slot === "center" && <span className="seo-ritual-shimmer" />}
+            </div>
+          ))}
+        </div>
+        <div className="seo-ritual-copy">
+          <span>A GUIDED RITUAL</span>
+          <h3 className="serif">Every card you draw, read in context</h3>
+          <p>
+            Arcana AI weaves the cards you pulled, their positions and orientations, and
+            the question you asked into one clear, personal interpretation — never a
+            generic blurb.
+          </p>
+          <div className="seo-ritual-chips" aria-label="Reading features">
+            <span>Upright & reversed</span>
+            <span>Position-aware</span>
+            <span>Whole-spread synthesis</span>
+          </div>
+        </div>
       </div>
 
       <div className="seo-stat-band" aria-label="Arcana AI tarot facts">
@@ -590,49 +634,6 @@ function SeoSection({
             <p>{pillar.copy}</p>
           </article>
         ))}
-      </div>
-
-      <div className="seo-intro">
-        <div className="seo-copy">
-          <span className="seo-kicker">TAROT AI, DONE RIGHT</span>
-          <h2 className="serif">
-            Every spread reads the full story
-          </h2>
-          <p>
-            One-card readings are quick and focused. Three-card spreads show momentum.
-            Love, career, money, decision, shadow, lunar, and Year Ahead layouts help
-            match the ritual to the question you are really asking.
-          </p>
-          <p>
-            Each position is named before you draw, then the AI interpretation connects
-            the card meaning to that exact position. The result feels like a coherent
-            reading instead of a stack of disconnected card definitions.
-          </p>
-        </div>
-        <div className="seo-art starfield" aria-hidden="true">
-          <div className="hero-aura" />
-          <div className="seo-art-inner">
-            {[
-              ["02", "The High Priestess", -18, 1],
-              ["19", "The Sun", 0, 3],
-              ["17", "The Star", 18, 1],
-            ].map(([num, name, rot, z]) => (
-              <div
-                className="seo-fan-card tarot-card"
-                key={name}
-                style={{
-                  transform: `translateX(-50%) rotate(${rot}deg)`,
-                  zIndex: Number(z),
-                  width: name === "The Sun" ? 92 : 86,
-                  height: name === "The Sun" ? 148 : 138,
-                  bottom: name === "The Sun" ? 52 : 44,
-                }}
-              >
-                <img alt={String(name)} src={cardImage(String(num), String(name))} />
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className="faq-wrap">
