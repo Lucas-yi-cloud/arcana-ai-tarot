@@ -1364,6 +1364,7 @@ export default function TarotApp() {
   }
 
   const planName = selectedPlan === "year" ? "Annual Pass" : "Quarterly Pass";
+  const planPrice = selectedPlan === "year" ? "$19.99" : "$9.99";
   const activeDays = user ? membershipDaysLeft(user) : null;
 
   return (
@@ -1387,12 +1388,13 @@ export default function TarotApp() {
             className={`nav-pill ${route === "history" ? "active" : ""}`}
             onClick={() => setRoute("history")}
           >
-            Journals
+            Readings
           </button>
         </div>
         <div className="account-actions">
           {user?.subscribed ? (
             <div className="pro-pill">
+              <span style={{ color: "var(--gold-bright)" }}>↯</span>
               <span style={{ color: "var(--gold-bright)" }}>PRO</span>
               <span style={{ color: "rgba(255,255,255,.62)", fontWeight: 600 }}>
                 {activeDays !== null ? `${activeDays}d left` : "Active"}
@@ -2010,7 +2012,7 @@ export default function TarotApp() {
                 Unlimited readings await
               </h2>
               <p style={{ color: "rgba(255,255,255,.72)", marginBottom: 0 }}>
-                Unlock every spread with a Stripe subscription.
+                Unlock every spread and ask the cards as often as you like with a single pass.
               </p>
             </div>
             <div className="modal-body">
@@ -2036,7 +2038,7 @@ export default function TarotApp() {
                     <span>
                       <strong>Annual Pass</strong>
                       <br />
-                      <small>$19.99 · 365 days · unlimited readings</small>
+                      <small>$19.99 · 365 days · unlimited readings · ≈ $1.67 / mo</small>
                     </span>
                     <span className="tag">BEST VALUE</span>
                   </button>
@@ -2050,7 +2052,7 @@ export default function TarotApp() {
                     <span>
                       <strong>Quarterly Pass</strong>
                       <br />
-                      <small>$9.99 · 90 days · unlimited readings</small>
+                      <small>$9.99 · 90 days · unlimited readings · ≈ $3.33 / mo</small>
                     </span>
                     <span className="tag">FLEXIBLE</span>
                   </button>
@@ -2066,10 +2068,10 @@ export default function TarotApp() {
                     onClick={() => void startCheckout(selectedPlan)}
                     aria-label={`Subscribe to the ${planName} with Stripe`}
                   >
-                    {checkoutBusy ? "Redirecting…" : `Subscribe — ${planName}`}
+                    {checkoutBusy ? "Redirecting…" : `Subscribe — ${planPrice}`}
                   </button>
                   {checkoutMessage && <p className="message">{checkoutMessage}</p>}
-                  <p className="message">Secure checkout by Stripe · status confirmed server-side.</p>
+                  <p className="message">Cancel anytime · renews automatically · secure checkout.</p>
                 </>
               )}
             </div>
