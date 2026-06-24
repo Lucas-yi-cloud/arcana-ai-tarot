@@ -2,6 +2,10 @@ import { env } from "cloudflare:workers";
 
 export type AppEnv = {
   DB?: D1Database;
+  // Cloud Run / Node: reach the same D1 database over its HTTP API (see db/index.ts).
+  CF_ACCOUNT_ID?: string;
+  CF_D1_DATABASE_ID?: string;
+  CF_D1_API_TOKEN?: string;
   AUTH_SECRET?: string;
   AUTH_DEV_MODE?: string;
   APP_BASE_URL?: string;
