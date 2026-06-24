@@ -11,6 +11,33 @@ export function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+/**
+ * Public origin of the request. On Cloudflare Workers `request.url` is already
+ * the public URL, but behind a proxy (e.g. Cloud Run / Next standalone)
+ * `request.url` is the internal bind address (0.0.0.0:8080), so prefer the
+ * forwarded host headers. Used to build OAuth redirect URIs and Stripe
+ * success/cancel URLs that must point back at the real host the user is on.
+ */
+export function requestOrigin(request: Request): string {
+  const forwardedProto = (request.headers.get("x-forwarded-proto") ?? "").split(",")[0].trim();
+  const host = (
+    request.headers.get("x-forwarded-host") ??
+    request.headers.get("host") ??
+    ""
+  )
+    .split(",")[0]
+    .trim();
+  if (host) {
+    const proto = forwardedProto || (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
+    return `${proto}://${host}`;
+  }
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return "";
+  }
+}
+
 export function randomId(prefix = "") {
   const bytes = new Uint8Array(18);
   crypto.getRandomValues(bytes);

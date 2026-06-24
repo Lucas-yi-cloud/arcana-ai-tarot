@@ -4,7 +4,7 @@ import { subscriptions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { getAppEnv } from "@/lib/env";
 import { createCheckoutSession, stripePriceId, type StripePlan } from "@/lib/stripe";
-import { jsonError } from "@/lib/security";
+import { jsonError, requestOrigin } from "@/lib/security";
 
 function isPlan(value: string): value is StripePlan {
   return value === "year" || value === "quarter";
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const plan = payload.plan ?? "";
     if (!isPlan(plan)) return jsonError("Invalid plan");
 
-    const origin = getAppEnv().APP_BASE_URL || new URL(request.url).origin;
+    const origin = getAppEnv().APP_BASE_URL || requestOrigin(request);
 
     // Reuse the user's existing Stripe customer if we already created one, so
     // repeat purchases don't spawn duplicate customers.

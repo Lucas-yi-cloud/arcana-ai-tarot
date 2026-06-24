@@ -3,7 +3,7 @@ import { getDb } from "@/db";
 import { oauthStates } from "@/db/schema";
 import { createUserSession, findOrCreateUser } from "@/lib/auth";
 import { getAppEnv, requireEnv } from "@/lib/env";
-import { ipHash, normalizeEmail, randomId, sha256 } from "@/lib/security";
+import { ipHash, normalizeEmail, randomId, requestOrigin, sha256 } from "@/lib/security";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -35,7 +35,7 @@ type VerifiedGoogleProfile = GoogleProfile & {
 const encoder = new TextEncoder();
 
 function baseUrl(request: Request) {
-  return (getAppEnv().APP_BASE_URL || new URL(request.url).origin).replace(/\/$/, "");
+  return (getAppEnv().APP_BASE_URL || requestOrigin(request)).replace(/\/$/, "");
 }
 
 function callbackUrl(request: Request) {
