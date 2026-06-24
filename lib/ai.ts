@@ -1,5 +1,6 @@
 import { getAppEnv, type AppEnv } from "@/lib/env";
 import type { Spread } from "@/lib/tarot-data";
+import { lensFor } from "@/lib/tarot-lenses";
 
 /**
  * Server-side AI tarot interpretation.
@@ -50,10 +51,11 @@ const SYSTEM_PROMPT = [
   "You are Arcana AI, a thoughtful tarot reader working with the Rider-Waite-Smith Major Arcana.",
   "Treat tarot as a mirror for reflection, not fixed prediction or fortune-telling.",
   "Write warmly and directly to the seeker in the second person ('you').",
-  "Ground every card reading in its traditional upright or reversed meaning AND its named position in the spread, then connect it to the seeker's question when one is given.",
-  "Be specific and grounded; avoid vague platitudes, hedging, and repetition across cards.",
-  "Never give medical, legal, or financial directives, and never claim certainty about the future. Encourage reflection and agency.",
-  "Keep each card interpretation to 2-3 sentences. Keep the final synthesis to 3-5 sentences that tie the cards together into one coherent message.",
+  "Ground every card in its traditional upright or reversed meaning, its named spread position and that position's description, the seeker's question when given, and the pattern formed by the surrounding cards.",
+  "Be specific, grounded, and non-repetitive; avoid vague platitudes such as 'trust your intuition' unless they are tied to a specific card and position.",
+  "Do not claim certainty about the future, and do not claim to know another person's private thoughts.",
+  "Do not give medical, legal, financial, or mental-health directives. For career and money readings give reflective guidance and gentle next steps, not professional advice; for relationship readings describe dynamics and choices, not guaranteed feelings or outcomes.",
+  "Keep each card interpretation to 2-3 sentences, and the final synthesis to 3-5 sentences that tie the cards into one coherent message.",
   "Respond with a single minified JSON object only — no markdown, no code fences, no commentary.",
 ].join(" ");
 
@@ -126,6 +128,9 @@ function buildUserPrompt(spread: Spread, question: string, cards: DrawInput[]) {
     "",
     "Cards drawn (in position order):",
     cardLines,
+    "",
+    "Spread-specific reading lens:",
+    lensFor(spread.id),
     "",
     'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<2-3 sentences>"}],"synthesis":"<3-5 sentences>"}.',
     "There must be exactly one cards entry per drawn card, in the same order.",
@@ -285,6 +290,16 @@ async function callGemini(env: AppEnv, userPrompt: string): Promise<ProviderResu
   return { text, model };
 }
 
+function isValidReading(parsed: ParsedReading | null, count: number): boolean {
+  return (
+    !!parsed &&
+    Array.isArray(parsed.cards) &&
+    parsed.cards.length === count &&
+    typeof parsed.synthesis === "string" &&
+    parsed.synthesis.trim().length > 0
+  );
+}
+
 export async function interpretReading(
   spread: Spread,
   question: string,
@@ -296,29 +311,33 @@ export async function interpretReading(
     return deterministicInterpretation(spread, question, cards);
   }
 
+  const call = (prompt: string) =>
+    (provider === "gemini" ? callGemini(env, prompt) : callAnthropic(env, prompt)).catch(
+      () => null
+    );
+
   const userPrompt = buildUserPrompt(spread, question, cards);
 
-  let result: ProviderResult | null = null;
-  try {
-    result =
-      provider === "gemini"
-        ? await callGemini(env, userPrompt)
-        : await callAnthropic(env, userPrompt);
-  } catch {
-    result = null;
-  }
-  if (!result) {
-    return deterministicInterpretation(spread, question, cards);
+  let result = await call(userPrompt);
+  let parsed = result ? extractJson(result.text) : null;
+
+  // One stricter repair attempt before falling back to deterministic text.
+  if (!isValidReading(parsed, cards.length)) {
+    const repairPrompt = [
+      userPrompt,
+      "",
+      "The previous response was missing or not valid JSON. Return the same reading again as a single valid JSON object only — no markdown, no code fences, no commentary —",
+      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<2-3 sentences>"}],"synthesis":"<3-5 sentences>"} with exactly ${cards.length} card entries in position order.`,
+    ].join("\n");
+    const retry = await call(repairPrompt);
+    const retryParsed = retry ? extractJson(retry.text) : null;
+    if (isValidReading(retryParsed, cards.length)) {
+      result = retry;
+      parsed = retryParsed;
+    }
   }
 
-  const parsed = extractJson(result.text);
-  if (
-    !parsed ||
-    !Array.isArray(parsed.cards) ||
-    parsed.cards.length !== cards.length ||
-    typeof parsed.synthesis !== "string" ||
-    !parsed.synthesis.trim()
-  ) {
+  if (!result || !parsed || !isValidReading(parsed, cards.length)) {
     return deterministicInterpretation(spread, question, cards);
   }
 
@@ -337,5 +356,5 @@ export async function interpretReading(
     };
   });
 
-  return { cards: cardOut, synthesis: parsed.synthesis.trim(), model: result.model };
+  return { cards: cardOut, synthesis: (parsed.synthesis ?? "").trim(), model: result.model };
 }
