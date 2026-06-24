@@ -74,12 +74,199 @@ type StripeConfig = {
   prices: Record<Plan, string>;
 };
 
-const prompts = [
+type SpreadSeoMeta = {
+  cardNum: string;
+  cardName: string;
+  p1: string;
+};
+
+const siteBaseUrl = "https://aitarotreading.app";
+const siteTitle = "AI Tarot Reading — Free Online Tarot Card Readings | Arcana AI";
+const siteDescription =
+  "Get an AI tarot reading online in seconds. Ask a question, draw the cards, and let Arcana AI interpret the Rider-Waite deck — from a daily one-card draw to the full Celtic Cross. Free, private, and accurate.";
+const siteImage = `${siteBaseUrl}/og-image.jpg`;
+
+const defaultPrompts = [
   "Where is this relationship heading?",
   "What should I focus on this month?",
   "What am I not seeing?",
   "Is this the right move for my career?",
+  "What is the smartest next step to take?",
 ];
+
+const spreadPrompts: Record<string, string[]> = {
+  daily: [
+    "What energy should I carry into today?",
+    "What should I give my attention to right now?",
+    "What am I overlooking this morning?",
+    "What lesson is today trying to teach me?",
+    "How can I make the most of today?",
+  ],
+  yesno: [
+    "Should I say yes to this opportunity?",
+    "Is now the right time to act?",
+    "Should I reach out to them?",
+    "Is this worth pursuing?",
+    "Should I let this go?",
+  ],
+  "past-present-future": [
+    "How did I get to where I am now?",
+    "Where is this situation heading?",
+    "What from my past is still shaping this?",
+    "What does the road ahead look like?",
+    "How does this chapter resolve?",
+  ],
+  "love-connection": [
+    "Where is this relationship heading?",
+    "What does this person truly feel for me?",
+    "What is blocking us from getting closer?",
+    "How can I open my heart again?",
+    "Is this connection worth fighting for?",
+  ],
+  "career-path": [
+    "Is this the right move for my career?",
+    "What should I focus on to grow at work?",
+    "How do I navigate this crossroads in my job?",
+    "What is holding my career back?",
+    "Should I make a change in my work life?",
+  ],
+  "celtic-cross": [
+    "What is really going on beneath this situation?",
+    "What is the heart of the matter I am facing?",
+    "What outcome am I moving toward?",
+    "What hidden influence should I be aware of?",
+    "How do all the pieces of this fit together?",
+  ],
+  "situation-action-outcome": [
+    "What is the smartest next step to take?",
+    "How should I handle this situation?",
+    "What action will move things forward?",
+    "What will happen if I act on this now?",
+    "How do I turn this worry into a plan?",
+  ],
+  "mind-body-spirit": [
+    "How can I find more balance right now?",
+    "What is my body trying to tell me?",
+    "What does my spirit need most?",
+    "Where am I out of alignment?",
+    "How do I reconnect with myself?",
+  ],
+  "decision-crossroads": [
+    "Which path is right for me?",
+    "What should I weigh before I choose?",
+    "What am I not seeing about my options?",
+    "Where does each choice lead?",
+    "How do I make this decision with confidence?",
+  ],
+  "shadow-and-light": [
+    "What am I not seeing in myself?",
+    "What is ready to be healed?",
+    "What is quietly holding me back?",
+    "What strength am I underusing?",
+    "What do I need to release?",
+  ],
+  "relationship-mirror": [
+    "How do we each see this relationship?",
+    "What bridges the distance between us?",
+    "What is the next move for us?",
+    "What does my partner need from me?",
+    "How can we grow closer?",
+  ],
+  "money-flow": [
+    "How can I improve my financial situation?",
+    "What is blocking my money from flowing?",
+    "Where is my next opportunity to earn?",
+    "What should I focus on with money now?",
+    "What money habit needs to change?",
+  ],
+  "new-moon-intention": [
+    "What should I invite into this new cycle?",
+    "What intention should I set right now?",
+    "What do I need to release to begin again?",
+    "What should I nurture this month?",
+    "How do I make a fresh start?",
+  ],
+  "year-ahead": [
+    "What should I focus on this year?",
+    "What theme runs through the months ahead?",
+    "Where will I grow the most this year?",
+    "What should I prepare for?",
+    "What does this year want to teach me?",
+  ],
+};
+
+const spreadSeoMeta: Record<string, SpreadSeoMeta> = {
+  daily: {
+    cardNum: "19",
+    cardName: "The Sun",
+    p1: "A daily tarot reading uses a single card to capture the energy of the day ahead. Instead of predicting fixed events, it offers a theme to carry with you, a quality to lean into, or a blind spot to watch.",
+  },
+  yesno: {
+    cardNum: "01",
+    cardName: "The Magician",
+    p1: "A yes / no tarot reading answers a direct question with a single card. The card is read for its overall tone, with the imagery adding nuance about why the answer leans yes, no, or not yet.",
+  },
+  "past-present-future": {
+    cardNum: "10",
+    cardName: "Wheel of Fortune",
+    p1: "The Past · Present · Future spread is the classic three-card tarot reading. It maps any situation across time: how it began, where it stands now, and the direction it is moving.",
+  },
+  "love-connection": {
+    cardNum: "06",
+    cardName: "The Lovers",
+    p1: "A love tarot reading looks at the space between two people: how each person feels, what is drawing them together, and what stands in the way so you can act with clarity.",
+  },
+  "career-path": {
+    cardNum: "08",
+    cardName: "Strength",
+    p1: "A career tarot reading maps the road ahead in work and purpose. It looks at where you stand, the obstacle in your path, the hidden strength you can draw on, and the most promising direction forward.",
+  },
+  "celtic-cross": {
+    cardNum: "02",
+    cardName: "The High Priestess",
+    p1: "The Celtic Cross is the most comprehensive traditional tarot spread. Across ten positions it examines a question from every angle, including the heart of the matter, outside influences, hopes, fears, and the final outcome.",
+  },
+  "situation-action-outcome": {
+    cardNum: "07",
+    cardName: "The Chariot",
+    p1: "The Situation · Action · Outcome spread is built for practical decisions. It names where you stand, suggests the wisest action, and shows where that action likely leads.",
+  },
+  "mind-body-spirit": {
+    cardNum: "14",
+    cardName: "Temperance",
+    p1: "The Mind · Body · Spirit spread is a wellbeing check-in across three layers of yourself: your thoughts, your physical energy, and your deeper sense of meaning.",
+  },
+  "decision-crossroads": {
+    cardNum: "11",
+    cardName: "Justice",
+    p1: "The Decision Crossroads spread lays two possible paths side by side so you can compare them clearly. It surfaces the trade-offs of both options so you can choose with open eyes.",
+  },
+  "shadow-and-light": {
+    cardNum: "18",
+    cardName: "The Moon",
+    p1: "The Shadow & Light spread is a tool for self-understanding and healing. It reveals what is quietly blocking you, what is ready to grow, and what part of you is asking to be released.",
+  },
+  "relationship-mirror": {
+    cardNum: "03",
+    cardName: "The Empress",
+    p1: "The Relationship Mirror spread reads a connection from both perspectives. It shows how you experience the relationship, how the other person does, the bridge between you, and the most constructive next move.",
+  },
+  "money-flow": {
+    cardNum: "10",
+    cardName: "Wheel of Fortune",
+    p1: "The Money Flow spread examines your relationship with money across earning, spending, blocks, opportunity, and the next practical action to take.",
+  },
+  "new-moon-intention": {
+    cardNum: "17",
+    cardName: "The Star",
+    p1: "The New Moon Intention spread is a ritual for fresh starts. It helps you name what to invite into a new cycle, what to release from the last one, and what to nurture as your intention takes root.",
+  },
+  "year-ahead": {
+    cardNum: "21",
+    cardName: "The World",
+    p1: "The Year Ahead spread draws twelve cards, one for each month, to map the themes of the year to come and show where growth, challenge, and opportunity are likely to cluster.",
+  },
+};
 
 const googleResumeKey = "arcana.googleLoginResume";
 const checkoutResumeKey = "arcana.checkoutResume";
@@ -106,6 +293,70 @@ const faqs = [
     a: "You can begin with two free readings. After that, Arcana Pro unlocks unlimited readings through a Stripe subscription linked to your account.",
   },
 ];
+
+function clampDescription(value: string) {
+  return value.length > 300 ? `${value.slice(0, 297)}...` : value;
+}
+
+function setMetaByName(name: string, content: string) {
+  let element = document.head.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+  if (!element) {
+    element = document.createElement("meta");
+    element.name = name;
+    document.head.appendChild(element);
+  }
+  element.content = content;
+}
+
+function setMetaByProperty(property: string, content: string) {
+  let element = document.head.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
+  if (!element) {
+    element = document.createElement("meta");
+    element.setAttribute("property", property);
+    document.head.appendChild(element);
+  }
+  element.content = content;
+}
+
+function setCanonical(href: string) {
+  let element = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+  if (!element) {
+    element = document.createElement("link");
+    element.rel = "canonical";
+    document.head.appendChild(element);
+  }
+  element.href = href;
+}
+
+function syncDocumentMeta(spread: Spread | null) {
+  if (typeof document === "undefined") return;
+
+  const seo = spread ? spreadSeoMeta[spread.id] : null;
+  const title = spread
+    ? `${spread.name} Tarot Reading — Free AI ${spread.name} Spread | Arcana AI`
+    : siteTitle;
+  const description = spread
+    ? clampDescription(
+        `${spread.blurb} ${
+          seo?.p1 ??
+          `Ask a question and let Arcana AI read your ${spread.name} spread instantly.`
+        }`
+      )
+    : siteDescription;
+  const url = spread ? `${siteBaseUrl}/spread/${spread.id}` : `${siteBaseUrl}/`;
+  const image = seo ? cardImage(seo.cardNum, seo.cardName) : siteImage;
+
+  document.title = title;
+  setMetaByName("description", description);
+  setCanonical(url);
+  setMetaByProperty("og:title", title);
+  setMetaByProperty("og:description", description);
+  setMetaByProperty("og:url", url);
+  setMetaByProperty("og:image", image);
+  setMetaByName("twitter:title", title);
+  setMetaByName("twitter:description", description);
+  setMetaByName("twitter:image", image);
+}
 
 function LogoMark() {
   return (
@@ -240,6 +491,12 @@ function SeoSection({
   openFaq: number;
   onToggleFaq: (index: number) => void;
 }) {
+  const stats = [
+    ["14", "tarot spreads"],
+    ["22", "Major Arcana cards"],
+    ["1909", "Rider-Waite tradition"],
+    ["100%", "private account history"],
+  ];
   const pillars = [
     {
       title: "Readings grounded in experience",
@@ -283,23 +540,73 @@ function SeoSection({
 
   return (
     <section className="seo-block">
+      <div className="seo-copy seo-copy-centered">
+        <span className="seo-kicker">TAROT AI, DONE RIGHT</span>
+        <h2 className="serif">
+          A tarot AI built for a real reading, not a random card generator
+        </h2>
+        <p>
+          Arcana AI turns the centuries-old practice of tarot into a guided digital
+          ritual. Choose from fourteen spreads, hold your question, and draw from the
+          Rider-Waite Major Arcana. Every <strong>AI tarot reading</strong> interprets
+          the exact cards you drew, their position, their orientation, and the question
+          you asked.
+        </p>
+        <p>
+          Where many <strong>tarot AI</strong> tools return generic blurbs, Arcana AI
+          reads the whole spread as one story: how the cards relate, what tension runs
+          between them, and where the reading points next.
+        </p>
+      </div>
+
+      <div className="seo-stat-band" aria-label="Arcana AI tarot facts">
+        {stats.map(([value, label]) => (
+          <div className="seo-stat" key={label}>
+            <strong className="serif">{value}</strong>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="seo-feature-row">
+        {pillars.map((pillar) => (
+          <article className="seo-feature" key={pillar.title}>
+            <div className="seo-feature-icon">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 32 32"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {pillar.icon}
+              </svg>
+            </div>
+            <h3>{pillar.title}</h3>
+            <p>{pillar.copy}</p>
+          </article>
+        ))}
+      </div>
+
       <div className="seo-intro">
         <div className="seo-copy">
           <span className="seo-kicker">TAROT AI, DONE RIGHT</span>
           <h2 className="serif">
-            A tarot AI built for a real reading, not a random card generator
+            Every spread reads the full story
           </h2>
           <p>
-            Arcana AI turns the centuries-old practice of tarot into a guided digital
-            ritual. Choose from fourteen spreads, hold your question, and draw from the
-            Rider-Waite Major Arcana. Every <strong>AI tarot reading</strong> interprets
-            the exact cards you drew, their position, their orientation, and the question
-            you asked.
+            One-card readings are quick and focused. Three-card spreads show momentum.
+            Love, career, money, decision, shadow, lunar, and Year Ahead layouts help
+            match the ritual to the question you are really asking.
           </p>
           <p>
-            Where many <strong>tarot AI</strong> tools return generic blurbs, Arcana AI
-            reads the whole spread as one story: how the cards relate, what tension runs
-            between them, and where the reading points next.
+            Each position is named before you draw, then the AI interpretation connects
+            the card meaning to that exact position. The result feels like a coherent
+            reading instead of a stack of disconnected card definitions.
           </p>
         </div>
         <div className="seo-art starfield" aria-hidden="true">
@@ -326,30 +633,6 @@ function SeoSection({
             ))}
           </div>
         </div>
-      </div>
-
-      <div className="pillar-grid">
-        {pillars.map((pillar) => (
-          <article className="pillar-card" key={pillar.title}>
-            <div className="pillar-head">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 32 32"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                {pillar.icon}
-              </svg>
-              <h3>{pillar.title}</h3>
-            </div>
-            <p>{pillar.copy}</p>
-          </article>
-        ))}
       </div>
 
       <div className="faq-wrap">
@@ -640,7 +923,7 @@ export default function TarotApp() {
   const [saving, setSaving] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const [aiSynthesis, setAiSynthesis] = useState("");
-  const [openFaq, setOpenFaq] = useState(0);
+  const [openFaq, setOpenFaq] = useState(-1);
   const beginDrawRef = useRef<() => Promise<void>>(async () => undefined);
 
   const spread = useMemo(
@@ -648,6 +931,10 @@ export default function TarotApp() {
     [spreadId]
   );
   const synthesis = useMemo(() => getSynthesis(cards, question, spread), [cards, question, spread]);
+  const questionPrompts = useMemo(
+    () => spreadPrompts[spread.id] ?? defaultPrompts,
+    [spread.id]
+  );
 
   async function refreshMe() {
     const response = await fetch("/api/me");
@@ -731,6 +1018,11 @@ export default function TarotApp() {
       window.sessionStorage.removeItem(googleResumeKey);
     }
   }, [user]);
+
+  useEffect(() => {
+    const onSpreadRoute = route === "detail" || route === "question" || route === "draw" || route === "result";
+    syncDocumentMeta(onSpreadRoute ? spread : null);
+  }, [route, spread]);
 
   useEffect(() => {
     if (route !== "history" || !user) return;
@@ -1400,7 +1692,7 @@ export default function TarotApp() {
               placeholder="Ask about love, work, timing, or the pattern you keep circling..."
             />
             <div className="prompt-row" style={{ marginTop: 14 }}>
-              {prompts.map((prompt) => (
+              {questionPrompts.map((prompt) => (
                 <button className="prompt-chip" key={prompt} onClick={() => setQuestion(prompt)}>
                   {prompt}
                 </button>
