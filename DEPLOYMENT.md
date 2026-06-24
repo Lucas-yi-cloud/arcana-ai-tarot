@@ -90,7 +90,7 @@ each as a Wrangler secret:
 
 ```bash
 npx wrangler secret put AUTH_SECRET            # required: long random string
-npx wrangler secret put ANTHROPIC_API_KEY      # enables real AI readings
+npx wrangler secret put GEMINI_API_KEY         # enables real AI readings (or ANTHROPIC_API_KEY)
 npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put STRIPE_SECRET_KEY
@@ -114,13 +114,14 @@ node -e "console.log(crypto.randomBytes(48).toString('base64url'))"
 | Feature | Secrets |
 |---|---|
 | **Sessions** (always) | `AUTH_SECRET` |
-| **Real AI readings** | `ANTHROPIC_API_KEY` (optional `AI_MODEL`, default `claude-opus-4-8`) |
+| **Real AI readings** | one of `GEMINI_API_KEY` (optional `GEMINI_MODEL`, default `gemini-2.5-flash`) or `ANTHROPIC_API_KEY` (optional `AI_MODEL`, default `claude-opus-4-8`); optional `AI_PROVIDER` to force one |
 | **Google sign-in** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_BASE_URL` |
 | **Email login codes** | `RESEND_API_KEY`, `LOGIN_EMAIL_FROM` (else set `AUTH_DEV_MODE=true`) |
 | **Stripe subscriptions** | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_YEAR`, `STRIPE_PRICE_ID_QUARTER`, `APP_BASE_URL` (optional: `STRIPE_PUBLISHABLE_KEY`, unused by hosted Checkout) |
 
-Without `ANTHROPIC_API_KEY`, readings fall back to deterministic Rider-Waite
-text — the app still works, it just isn't AI-generated.
+Without an AI key (`GEMINI_API_KEY` or `ANTHROPIC_API_KEY`), readings fall back
+to deterministic Rider-Waite text — the app still works, it just isn't
+AI-generated.
 
 ---
 
@@ -172,11 +173,19 @@ its signing secret (`whsec_…`) in
 success/cancel redirects come back to the app. Use live keys (`sk_live_…`) only
 after testing with `sk_test_…`; mode is implied by the key prefix.
 
-### Anthropic
+### AI provider (Gemini or Anthropic)
 
-Create an API key at the Anthropic console and set `ANTHROPIC_API_KEY`. The
-default model is `claude-opus-4-8`; override with `AI_MODEL` (e.g.
-`claude-sonnet-4-6` or `claude-haiku-4-5`) to trade quality for cost.
+Set **one** provider key — the worker auto-detects it (Gemini preferred), or set
+`AI_PROVIDER` to force `gemini` / `anthropic`.
+
+- **Gemini:** create an API key in Google AI Studio and set `GEMINI_API_KEY`.
+  Default model `gemini-2.5-flash`; override with `GEMINI_MODEL`.
+- **Anthropic:** create an API key at the Anthropic console and set
+  `ANTHROPIC_API_KEY`. Default model `claude-opus-4-8`; override with `AI_MODEL`
+  (e.g. `claude-sonnet-4-6` or `claude-haiku-4-5`) to trade quality for cost.
+
+Both call structured-JSON output and parse to the same shape; the rest of the
+pipeline is provider-agnostic.
 
 ---
 

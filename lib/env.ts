@@ -16,6 +16,9 @@ export type AppEnv = {
   STRIPE_PRICE_ID_QUARTER?: string;
   ANTHROPIC_API_KEY?: string;
   AI_MODEL?: string;
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
+  AI_PROVIDER?: "gemini" | "anthropic";
 };
 
 export function getAppEnv() {

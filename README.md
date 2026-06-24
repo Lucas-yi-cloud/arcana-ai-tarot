@@ -104,15 +104,23 @@ Test with card `4242 4242 4242 4242`, any future expiry and CVC.
 
 ## AI Interpretation
 
-Readings are generated server-side by Claude (`lib/ai.ts` → `/api/readings/interpret`).
-The endpoint rebuilds the draw from the canonical deck/spread (so card meanings
-can't be tampered with by the client), calls the Anthropic Messages API for a
-per-card reading plus a final synthesis, and consumes a free read only when
+Readings are generated server-side (`lib/ai.ts` → `/api/readings/interpret`). The
+endpoint rebuilds the draw from the canonical deck/spread (so card meanings can't
+be tampered with by the client), asks the model for a per-card reading plus a
+final synthesis (structured JSON output), and consumes a free read only when
 generation succeeds.
 
-Set `ANTHROPIC_API_KEY` to enable it; optionally override `AI_MODEL` (default
-`claude-opus-4-8`). Without a key it falls back to deterministic Rider-Waite
-text, so the app still runs end-to-end with no secrets.
+Two providers are supported — set **one** key:
+
+- **Google Gemini** — `GEMINI_API_KEY` (AI Studio key), optional `GEMINI_MODEL`
+  (default `gemini-2.5-flash`).
+- **Anthropic Claude** — `ANTHROPIC_API_KEY`, optional `AI_MODEL` (default
+  `claude-opus-4-8`).
+
+The provider is auto-detected (Gemini preferred when both keys are present), or
+force one with `AI_PROVIDER="gemini"｜"anthropic"`. Without any key it falls back
+to deterministic Rider-Waite text, so the app still runs end-to-end with no
+secrets.
 
 ## Testing
 

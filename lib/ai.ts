@@ -1,18 +1,24 @@
-import { getAppEnv } from "@/lib/env";
+import { getAppEnv, type AppEnv } from "@/lib/env";
 import type { Spread } from "@/lib/tarot-data";
 
 /**
  * Server-side AI tarot interpretation.
  *
- * Uses the Anthropic Messages API (raw fetch, matching how the rest of this
- * worker calls Google / Stripe / Resend). When no `ANTHROPIC_API_KEY` is set
- * the reading degrades to deterministic Rider-Waite text so the app still runs
- * end-to-end in local dev without any secrets.
+ * Supports two providers (raw fetch, matching how the rest of this worker calls
+ * Google / Stripe / Resend): Google Gemini (Generative Language API) and
+ * Anthropic Claude. The provider is chosen by `AI_PROVIDER`, otherwise
+ * auto-detected from whichever API key is configured (Gemini preferred). With
+ * no key set the reading degrades to deterministic Rider-Waite text so the app
+ * still runs end-to-end in local dev without any secrets.
  */
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
-const DEFAULT_MODEL = "claude-opus-4-8";
+const DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-8";
+
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+
 const FALLBACK_MODEL = "deterministic";
 
 export type DrawInput = {
@@ -68,6 +74,27 @@ const RESPONSE_SCHEMA = {
       },
     },
     synthesis: { type: "string" },
+  },
+  required: ["cards", "synthesis"],
+} as const;
+
+// Gemini's responseSchema uses OpenAPI-style uppercase type names and does not
+// accept `additionalProperties`; otherwise it mirrors RESPONSE_SCHEMA.
+const GEMINI_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    cards: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          position: { type: "STRING" },
+          interpretation: { type: "STRING" },
+        },
+        required: ["position", "interpretation"],
+      },
+    },
+    synthesis: { type: "STRING" },
   },
   required: ["cards", "synthesis"],
 } as const;
@@ -151,6 +178,14 @@ type AnthropicResponse = {
   content?: Array<{ type: string; text?: string }>;
 };
 
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
+    finishReason?: string;
+  }>;
+  promptFeedback?: { blockReason?: string };
+};
+
 type ParsedReading = {
   cards?: Array<{ position?: string; interpretation?: string }>;
   synthesis?: string;
@@ -173,77 +208,134 @@ function extractJson(text: string): ParsedReading | null {
   }
 }
 
+type ProviderResult = { text: string; model: string };
+
+function selectProvider(env: AppEnv): "gemini" | "anthropic" | null {
+  const explicit = env.AI_PROVIDER?.toLowerCase();
+  if (explicit === "gemini") return env.GEMINI_API_KEY ? "gemini" : null;
+  if (explicit === "anthropic") return env.ANTHROPIC_API_KEY ? "anthropic" : null;
+  if (env.GEMINI_API_KEY) return "gemini";
+  if (env.ANTHROPIC_API_KEY) return "anthropic";
+  return null;
+}
+
+async function callAnthropic(env: AppEnv, userPrompt: string): Promise<ProviderResult | null> {
+  const apiKey = env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  const model = env.AI_MODEL || DEFAULT_ANTHROPIC_MODEL;
+
+  const response = await fetch(ANTHROPIC_URL, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": ANTHROPIC_VERSION,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 3000,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userPrompt }],
+      output_config: {
+        effort: "low",
+        format: { type: "json_schema", schema: RESPONSE_SCHEMA },
+      },
+    }),
+  });
+
+  if (!response.ok) return null;
+  const payload = (await response.json()) as AnthropicResponse;
+  if (payload.stop_reason === "refusal") return null;
+  const text = payload.content?.find((block) => block.type === "text")?.text ?? "";
+  if (!text) return null;
+  return { text, model: payload.model || model };
+}
+
+async function callGemini(env: AppEnv, userPrompt: string): Promise<ProviderResult | null> {
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  const model = env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+
+  const response = await fetch(
+    `${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: GEMINI_SCHEMA,
+          temperature: 0.9,
+          maxOutputTokens: 4096,
+          // Disable "thinking" so the whole output budget goes to the JSON
+          // answer (faster + cheaper for structured extraction).
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) return null;
+  const payload = (await response.json()) as GeminiResponse;
+  const text =
+    payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("") ?? "";
+  if (!text) return null;
+  return { text, model };
+}
+
 export async function interpretReading(
   spread: Spread,
   question: string,
   cards: DrawInput[]
 ): Promise<ReadingInterpretation> {
   const env = getAppEnv();
-  const apiKey = env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const provider = selectProvider(env);
+  if (!provider) {
     return deterministicInterpretation(spread, question, cards);
   }
 
-  const model = env.AI_MODEL || DEFAULT_MODEL;
+  const userPrompt = buildUserPrompt(spread, question, cards);
 
+  let result: ProviderResult | null = null;
   try {
-    const response = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 3000,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: buildUserPrompt(spread, question, cards) }],
-        output_config: {
-          effort: "low",
-          format: { type: "json_schema", schema: RESPONSE_SCHEMA },
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      return deterministicInterpretation(spread, question, cards);
-    }
-
-    const payload = (await response.json()) as AnthropicResponse;
-    if (payload.stop_reason === "refusal") {
-      return deterministicInterpretation(spread, question, cards);
-    }
-
-    const text = payload.content?.find((block) => block.type === "text")?.text ?? "";
-    const parsed = extractJson(text);
-    if (
-      !parsed ||
-      !Array.isArray(parsed.cards) ||
-      parsed.cards.length !== cards.length ||
-      typeof parsed.synthesis !== "string" ||
-      !parsed.synthesis.trim()
-    ) {
-      return deterministicInterpretation(spread, question, cards);
-    }
-
-    const cardOut: CardInterpretation[] = cards.map((card, index) => {
-      const text = parsed.cards?.[index]?.interpretation;
-      const safe =
-        typeof text === "string" && text.trim()
-          ? text.trim()
-          : deterministicInterpretation(spread, question, [card]).cards[0].text;
-      return {
-        num: card.num,
-        name: card.name,
-        posLabel: card.posLabel,
-        reversed: card.reversed,
-        text: safe,
-      };
-    });
-
-    return { cards: cardOut, synthesis: parsed.synthesis.trim(), model: payload.model || model };
+    result =
+      provider === "gemini"
+        ? await callGemini(env, userPrompt)
+        : await callAnthropic(env, userPrompt);
   } catch {
+    result = null;
+  }
+  if (!result) {
     return deterministicInterpretation(spread, question, cards);
   }
+
+  const parsed = extractJson(result.text);
+  if (
+    !parsed ||
+    !Array.isArray(parsed.cards) ||
+    parsed.cards.length !== cards.length ||
+    typeof parsed.synthesis !== "string" ||
+    !parsed.synthesis.trim()
+  ) {
+    return deterministicInterpretation(spread, question, cards);
+  }
+
+  const cardOut: CardInterpretation[] = cards.map((card, index) => {
+    const text = parsed.cards?.[index]?.interpretation;
+    const safe =
+      typeof text === "string" && text.trim()
+        ? text.trim()
+        : deterministicInterpretation(spread, question, [card]).cards[0].text;
+    return {
+      num: card.num,
+      name: card.name,
+      posLabel: card.posLabel,
+      reversed: card.reversed,
+      text: safe,
+    };
+  });
+
+  return { cards: cardOut, synthesis: parsed.synthesis.trim(), model: result.model };
 }
