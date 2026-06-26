@@ -1108,22 +1108,47 @@ button {
 
 .plan-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 22px 1fr auto;
   gap: 14px;
   align-items: center;
   width: 100%;
   margin-bottom: 12px;
-  border: 1px solid #e3e1e4;
+  border: 2px solid #e3e1e4;
   border-radius: 16px;
   background: #fff;
   cursor: pointer;
-  padding: 16px;
+  padding: 16px 18px;
   text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .plan-row.selected {
   border: 2px solid var(--purple);
   background: #f7f5fd;
+}
+
+.plan-radio {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #cfcdd0;
+  border-radius: 50%;
+}
+
+.plan-radio span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.plan-row.selected .plan-radio {
+  border-color: var(--purple);
+}
+
+.plan-row.selected .plan-radio span {
+  background: var(--purple);
 }
 
 .message {

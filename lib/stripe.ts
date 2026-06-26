@@ -1,4 +1,4 @@
-import { getAppEnv, requireEnv } from "@/lib/env";
+import { getAppEnv } from "@/lib/env";
 import { isValidStripeSignature } from "@/lib/stripe-signature";
 
 /**
@@ -13,24 +13,41 @@ import { isValidStripeSignature } from "@/lib/stripe-signature";
 
 const STRIPE_API = "https://api.stripe.com/v1";
 
+// Legacy plan keys are preserved because existing subscriptions and Checkout
+// metadata may already store them. In the current product copy, "year" is the
+// top Quarterly pass and "quarter" is the Monthly pass.
 export type StripePlan = "year" | "quarter";
 
+export function stripePriceIds() {
+  const env = getAppEnv();
+  return {
+    year: env.STRIPE_PRICE_ID_QUARTERLY ?? env.STRIPE_PRICE_ID_YEAR ?? "",
+    quarter: env.STRIPE_PRICE_ID_MONTHLY ?? env.STRIPE_PRICE_ID_QUARTER ?? "",
+  } satisfies Record<StripePlan, string>;
+}
+
 export function stripePriceId(plan: StripePlan) {
-  return plan === "year"
-    ? requireEnv("STRIPE_PRICE_ID_YEAR")
-    : requireEnv("STRIPE_PRICE_ID_QUARTER");
+  const priceId = stripePriceIds()[plan];
+  if (!priceId) {
+    throw new Error(
+      plan === "year"
+        ? "STRIPE_PRICE_ID_QUARTERLY is not configured"
+        : "STRIPE_PRICE_ID_MONTHLY is not configured"
+    );
+  }
+  return priceId;
 }
 
 export function planFromStripePriceId(priceId: string | null | undefined): StripePlan | null {
   if (!priceId) return null;
-  const env = getAppEnv();
-  if (priceId === env.STRIPE_PRICE_ID_YEAR) return "year";
-  if (priceId === env.STRIPE_PRICE_ID_QUARTER) return "quarter";
+  const prices = stripePriceIds();
+  if (priceId === prices.year) return "year";
+  if (priceId === prices.quarter) return "quarter";
   return null;
 }
 
 export function fallbackPeriodEnd(plan: StripePlan) {
-  const days = plan === "year" ? 365 : 90;
+  const days = plan === "year" ? 90 : 30;
   return Date.now() + days * 24 * 60 * 60 * 1000;
 }
 

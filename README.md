@@ -10,7 +10,7 @@ Arcana AI is a full-stack AI tarot reading web app built from a high-fidelity de
 - Google OAuth sign-in with email one-time-code fallback and HttpOnly session cookies
 - Server-side free-trial gating: 2 free readings before paywall, consumed only when a reading succeeds
 - D1-backed users, sessions, readings, subscriptions, and Stripe webhook events
-- Stripe Checkout subscription integration for annual and quarterly plans
+- Stripe Checkout subscription integration for quarterly and monthly plans
 - About, Privacy, Contact, SEO content, FAQ, and footer routes
 
 ## Stack
@@ -45,8 +45,8 @@ GOOGLE_CLIENT_SECRET=""
 STRIPE_SECRET_KEY=""
 STRIPE_PUBLISHABLE_KEY=""
 STRIPE_WEBHOOK_SECRET=""
-STRIPE_PRICE_ID_YEAR=""
-STRIPE_PRICE_ID_QUARTER=""
+STRIPE_PRICE_ID_QUARTERLY=""
+STRIPE_PRICE_ID_MONTHLY=""
 ```
 
 ## Database
@@ -82,10 +82,11 @@ npm run build
 In the Stripe Dashboard (Test mode first), create a product with two recurring
 prices:
 
-- Annual Pass: `$19.99` / year
-- Quarterly Pass: `$9.99` / every 3 months
+- Quarterly Pass: `$19.99` / every 90 days
+- Monthly Pass: `$9.99` / every 30 days
 
-Copy each price's `price_…` id into `STRIPE_PRICE_ID_YEAR` / `STRIPE_PRICE_ID_QUARTER`,
+Copy each price's `price_…` id into `STRIPE_PRICE_ID_QUARTERLY` /
+`STRIPE_PRICE_ID_MONTHLY`,
 and set `STRIPE_SECRET_KEY` (the publishable key is optional — hosted Checkout
 doesn't use it client-side). Add a webhook endpoint pointing at:
 

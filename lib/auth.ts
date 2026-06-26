@@ -58,8 +58,8 @@ function membershipFor(
   if (active && subscription?.plan === "quarter") {
     return {
       tier: "quarter",
-      label: "Quarterly member",
-      detail: "90-day unlimited pass",
+      label: "Monthly member",
+      detail: "30-day unlimited pass",
       currentPeriodEnd: subscription.currentPeriodEnd,
     };
   }
@@ -67,8 +67,8 @@ function membershipFor(
   if (active && subscription?.plan === "year") {
     return {
       tier: "year",
-      label: "Annual member",
-      detail: "365-day unlimited pass",
+      label: "Quarterly member",
+      detail: "90-day unlimited pass",
       currentPeriodEnd: subscription.currentPeriodEnd,
     };
   }

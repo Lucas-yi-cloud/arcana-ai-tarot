@@ -95,8 +95,8 @@ npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
-npx wrangler secret put STRIPE_PRICE_ID_YEAR
-npx wrangler secret put STRIPE_PRICE_ID_QUARTER
+npx wrangler secret put STRIPE_PRICE_ID_QUARTERLY
+npx wrangler secret put STRIPE_PRICE_ID_MONTHLY
 npx wrangler secret put RESEND_API_KEY         # optional: real login emails
 ```
 
@@ -117,7 +117,7 @@ node -e "console.log(crypto.randomBytes(48).toString('base64url'))"
 | **Real AI readings** | one of `GEMINI_API_KEY` (optional `GEMINI_MODEL`, default `gemini-2.5-flash`) or `ANTHROPIC_API_KEY` (optional `AI_MODEL`, default `claude-opus-4-8`); optional `AI_PROVIDER` to force one |
 | **Google sign-in** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_BASE_URL` |
 | **Email login codes** | `RESEND_API_KEY`, `LOGIN_EMAIL_FROM` (else set `AUTH_DEV_MODE=true`) |
-| **Stripe subscriptions** | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_YEAR`, `STRIPE_PRICE_ID_QUARTER`, `APP_BASE_URL` (optional: `STRIPE_PUBLISHABLE_KEY`, unused by hosted Checkout) |
+| **Stripe subscriptions** | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_QUARTERLY`, `STRIPE_PRICE_ID_MONTHLY`, `APP_BASE_URL` (optional: `STRIPE_PUBLISHABLE_KEY`, unused by hosted Checkout) |
 
 Without an AI key (`GEMINI_API_KEY` or `ANTHROPIC_API_KEY`), readings fall back
 to deterministic Rider-Waite text — the app still works, it just isn't
@@ -158,8 +158,8 @@ https://<your-domain>/api/auth/google/callback
 ### Stripe
 
 In the Stripe Dashboard (Test mode first), create a product with two recurring
-prices (Annual `$19.99`/year, Quarterly `$9.99`/3 months). Set the `price_…` ids
-as `STRIPE_PRICE_ID_YEAR` / `STRIPE_PRICE_ID_QUARTER` and the keys as
+prices (Quarterly `$19.99`/90 days, Monthly `$9.99`/30 days). Set the `price_…`
+ids as `STRIPE_PRICE_ID_QUARTERLY` / `STRIPE_PRICE_ID_MONTHLY` and the keys as
 `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY`. Register a webhook endpoint at:
 
 ```

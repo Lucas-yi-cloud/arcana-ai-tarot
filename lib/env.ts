@@ -16,6 +16,8 @@ export type AppEnv = {
   STRIPE_SECRET_KEY?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRICE_ID_QUARTERLY?: string;
+  STRIPE_PRICE_ID_MONTHLY?: string;
   STRIPE_PRICE_ID_YEAR?: string;
   STRIPE_PRICE_ID_QUARTER?: string;
   ANTHROPIC_API_KEY?: string;

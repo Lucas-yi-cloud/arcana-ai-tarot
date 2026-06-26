@@ -1,20 +1,19 @@
 import { getAppEnv } from "@/lib/env";
+import { stripePriceIds } from "@/lib/stripe";
 
 export async function GET() {
   const env = getAppEnv();
+  const prices = stripePriceIds();
   const enabled = Boolean(
     env.STRIPE_SECRET_KEY &&
       env.STRIPE_WEBHOOK_SECRET &&
-      env.STRIPE_PRICE_ID_YEAR &&
-      env.STRIPE_PRICE_ID_QUARTER
+      prices.year &&
+      prices.quarter
   );
 
   return Response.json({
     enabled,
     publishableKey: env.STRIPE_PUBLISHABLE_KEY ?? "",
-    prices: {
-      year: env.STRIPE_PRICE_ID_YEAR ?? "",
-      quarter: env.STRIPE_PRICE_ID_QUARTER ?? "",
-    },
+    prices,
   });
 }
