@@ -4,14 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
-import {
-  clampSeoDescription,
-  siteBaseUrl,
-  siteDescription,
-  siteImage,
-  siteTitle,
-  spreadSeoMeta,
-} from "@/lib/tarot-seo";
+import { siteTitle, spreadSeoMeta } from "@/lib/tarot-seo";
 
 type Route =
   | "home"
@@ -236,48 +229,6 @@ const faqs = [
   },
 ];
 
-function setMetaByName(name: string, content: string) {
-  const elements = Array.from(
-    document.head.querySelectorAll(`meta[name="${name}"]`)
-  ) as HTMLMetaElement[];
-  let element = elements[0];
-  if (!element) {
-    element = document.createElement("meta");
-    element.name = name;
-    document.head.appendChild(element);
-  }
-  element.content = content;
-  elements.slice(1).forEach((meta) => meta.remove());
-}
-
-function setMetaByProperty(property: string, content: string) {
-  const elements = Array.from(
-    document.head.querySelectorAll(`meta[property="${property}"]`)
-  ) as HTMLMetaElement[];
-  let element = elements[0];
-  if (!element) {
-    element = document.createElement("meta");
-    element.setAttribute("property", property);
-    document.head.appendChild(element);
-  }
-  element.content = content;
-  elements.slice(1).forEach((meta) => meta.remove());
-}
-
-function setCanonicalUrl(href: string) {
-  const links = Array.from(
-    document.head.querySelectorAll('link[rel="canonical"]')
-  ) as HTMLLinkElement[];
-  let element = links[0];
-  if (!element) {
-    element = document.createElement("link");
-    element.rel = "canonical";
-    document.head.appendChild(element);
-  }
-  element.href = href;
-  links.slice(1).forEach((link) => link.remove());
-}
-
 function routePath(route: Route, spread: Spread) {
   if (route === "detail" || route === "question" || route === "draw" || route === "result") {
     return `/spread/${spread.id}`;
@@ -289,35 +240,23 @@ function routePath(route: Route, spread: Spread) {
   return "/";
 }
 
-function staticRouteMeta(route: Route) {
+function documentTitleForRoute(route: Route, spread: Spread) {
+  if (route === "detail" || route === "question" || route === "draw" || route === "result") {
+    return `${spread.name} Tarot Reading — Free AI ${spread.name} Spread | Arcana AI`;
+  }
   if (route === "about") {
-    return {
-      title: "About Arcana AI — A Quieter Way to Ask the Cards",
-      description:
-        "Learn how Arcana AI pairs Rider-Waite tarot symbolism with AI-guided interpretation for private, reflective readings.",
-    };
+    return "About Arcana AI — A Quieter Way to Ask the Cards";
   }
   if (route === "privacy") {
-    return {
-      title: "Privacy — Arcana AI Tarot",
-      description:
-        "Read how Arcana AI handles accounts, saved tarot readings, payments, cookies, and privacy requests.",
-    };
+    return "Privacy — Arcana AI Tarot";
   }
   if (route === "contact") {
-    return {
-      title: "Contact — Arcana AI Tarot",
-      description:
-        "Contact Arcana AI for product feedback, support, billing, and privacy questions.",
-    };
+    return "Contact — Arcana AI Tarot";
   }
   if (route === "history") {
-    return {
-      title: "Journals — Arcana AI Tarot",
-      description: "Review your saved Arcana AI tarot readings and return to past spreads.",
-    };
+    return "Journals — Arcana AI Tarot";
   }
-  return { title: siteTitle, description: siteDescription };
+  return siteTitle;
 }
 
 function routeStateFromPath(pathname: string): { route: Route; spreadId?: string } {
@@ -330,40 +269,6 @@ function routeStateFromPath(pathname: string): { route: Route; spreadId?: string
     return { route: "detail", spreadId: spreadMatch[1] };
   }
   return { route: "home" };
-}
-
-function syncDocumentMeta(route: Route, spread: Spread) {
-  if (typeof document === "undefined") return;
-
-  const onSpreadRoute = route === "detail" || route === "question" || route === "draw" || route === "result";
-  const seo = onSpreadRoute ? spreadSeoMeta[spread.id] : null;
-  const staticMeta = staticRouteMeta(route);
-  const title = onSpreadRoute
-    ? `${spread.name} Tarot Reading — Free AI ${spread.name} Spread | Arcana AI`
-    : staticMeta.title;
-  const description = onSpreadRoute
-    ? clampSeoDescription(
-        `${spread.blurb} ${
-          seo?.p1 ??
-          `Ask a question and let Arcana AI read your ${spread.name} spread instantly.`
-        }`
-      )
-    : staticMeta.description;
-  const path = routePath(route, spread);
-  const url = `${siteBaseUrl}${path}`;
-  const image = seo ? `${siteBaseUrl}${cardImage(seo.cardNum, seo.cardName)}` : siteImage;
-
-  document.title = title;
-  setMetaByName("description", description);
-  setMetaByName("robots", route === "history" ? "noindex,follow" : "index,follow");
-  setCanonicalUrl(url);
-  setMetaByProperty("og:title", title);
-  setMetaByProperty("og:description", description);
-  setMetaByProperty("og:url", url);
-  setMetaByProperty("og:image", image);
-  setMetaByName("twitter:title", title);
-  setMetaByName("twitter:description", description);
-  setMetaByName("twitter:image", image);
 }
 
 function LogoMark() {
@@ -422,6 +327,7 @@ function membershipDaysLeft(user: User) {
 function membershipCaption(user: User, freeLimit: number) {
   if (user.membership.tier === "year") return "Quarterly pass · unlimited readings";
   if (user.membership.tier === "quarter") return "Monthly pass · unlimited readings";
+  if (user.subscribed) return "Pro pass · unlimited readings";
   return `${Math.max(0, freeLimit - user.freeUsed)} of ${freeLimit} free readings left`;
 }
 
@@ -1266,7 +1172,9 @@ export default function TarotApp({
   }, [user]);
 
   useEffect(() => {
-    syncDocumentMeta(route, spread);
+    if (typeof document !== "undefined") {
+      document.title = documentTitleForRoute(route, spread);
+    }
   }, [route, spread]);
 
   useEffect(() => {
