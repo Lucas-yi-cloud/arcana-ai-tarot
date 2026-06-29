@@ -18,7 +18,7 @@ export type SpreadSeoMeta = {
   faq: SpreadSeoFaq[];
 };
 
-export const siteBaseUrl = "https://aitarotreading.app";
+export const siteBaseUrl = "https://mystic-ai.top";
 export const siteTitle = "AI Tarot Reading — Free Online Tarot Card Readings | Arcana AI";
 export const siteDescription =
   "Get an AI tarot reading online in seconds. Ask a question, draw the cards, and let Arcana AI interpret the Rider-Waite deck — from a daily one-card draw to the full Celtic Cross. Free, private, and accurate.";

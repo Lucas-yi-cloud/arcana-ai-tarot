@@ -9,4 +9,4 @@ Allow: /
 User-agent: PerplexityBot
 Allow: /
 
-Sitemap: https://aitarotreading.app/sitemap.xml
+Sitemap: https://mystic-ai.top/sitemap.xml
