@@ -1605,9 +1605,6 @@ button {
   border: 1px solid rgba(29, 28, 31, 0.08);
   border-radius: 18px;
   background: rgba(29, 28, 31, 0.08);
-  animation: tarot-fade-up 0.8s ease both;
-  animation-timeline: view();
-  animation-range: entry 0% cover 24%;
 }
 
 .seo-stat {
@@ -1679,9 +1676,6 @@ button {
   border-radius: 24px;
   background: radial-gradient(130% 120% at 30% -10%, #3b2a6c, #23193c 55%, #16112a);
   padding: 52px 48px;
-  animation: tarot-fade-up 0.9s ease both;
-  animation-timeline: view();
-  animation-range: entry 0% cover 26%;
 }
 
 .seo-ritual-glow {
@@ -1692,6 +1686,12 @@ button {
   height: 240px;
   background: radial-gradient(circle, rgba(232, 205, 134, 0.22), rgba(168, 135, 46, 0.06) 45%, transparent 70%);
   animation: tarot-glow 7s ease-in-out infinite;
+}
+
+.seo-ritual-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .seo-ritual-stars span {
@@ -1862,9 +1862,6 @@ button {
 .seo-feature {
   padding: 8px 8px 4px;
   text-align: center;
-  animation: tarot-fade-up 0.7s ease both;
-  animation-timeline: view();
-  animation-range: entry 4% cover 24%;
 }
 
 .seo-feature-icon {
@@ -2203,10 +2200,18 @@ button {
   .spread-seo-step-grid,
   .spread-seo-scenario-grid,
   .seo-intro,
-  .seo-stat-band,
   .seo-feature-row,
   .footer-grid {
     grid-template-columns: 1fr;
+  }
+
+  .seo-stat-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .seo-stat {
+    min-height: 96px;
+    padding: 18px;
   }
 
   .seo-ritual-panel {
