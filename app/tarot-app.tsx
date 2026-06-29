@@ -828,6 +828,44 @@ function SpreadSeoContent({ spread }: { spread: Spread }) {
   );
 }
 
+function SpreadBreadcrumb({
+  spread,
+  onGoHome,
+}: {
+  spread: Spread;
+  onGoHome: () => void;
+}) {
+  return (
+    <nav className="breadcrumb" aria-label="Breadcrumb">
+      <button onClick={onGoHome}>Home</button>
+      <span aria-hidden="true">›</span>
+      <button onClick={onGoHome}>Spreads</button>
+      <span aria-hidden="true">›</span>
+      <strong>{spread.name}</strong>
+    </nav>
+  );
+}
+
+function SpreadReviewNote() {
+  return (
+    <aside className="review-note">
+      <span className="review-mark" aria-hidden="true">
+        <LogoMark />
+      </span>
+      <div>
+        <h2>Reviewed by the Arcana AI tarot team</h2>
+        <p>
+          Our readings follow the traditional Rider-Waite-Smith structure used by
+          practising tarot readers for over a century. Every spread and position
+          meaning on this page is reviewed by experienced readers for accuracy. Tarot
+          is a tool for reflection and self-insight, not a substitute for professional
+          medical, legal, or financial advice. Last updated June 2026.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 function SiteFooter({
   onOpenSpread,
   onGoHome,
@@ -1785,9 +1823,7 @@ export default function TarotApp({
 
       {route === "detail" && (
         <main className="page">
-          <button className="text-btn" onClick={goHome}>
-            ‹ All spreads
-          </button>
+          <SpreadBreadcrumb spread={spread} onGoHome={goHome} />
           <div className="detail-grid" style={{ marginTop: 22 }}>
             <section className="stage layout-panel starfield">
               <span className="preview-label">SPREAD LAYOUT</span>
@@ -1812,9 +1848,12 @@ export default function TarotApp({
             </section>
             <section>
               <h1 className="serif detail-title">{spread.name}</h1>
-              <p style={{ color: "var(--muted)", margin: "0 0 18px" }}>
-                {spread.count} {spread.count === 1 ? "card" : "cards"}
-              </p>
+              <div className="detail-meta">
+                <span>
+                  {spread.count} {spread.count === 1 ? "card" : "cards"}
+                </span>
+                {user?.subscribed && <b>UNLIMITED</b>}
+              </div>
               <p style={{ fontSize: 16, lineHeight: 1.6 }}>{spread.blurb}</p>
               <p style={{ color: "var(--muted)", lineHeight: 1.5 }}>
                 <strong style={{ color: "var(--ink)" }}>Good for:</strong> {spread.good}
@@ -1841,12 +1880,19 @@ export default function TarotApp({
               </button>
               <p className="message">
                 {user?.subscribed
-                  ? "Unlimited readings are active on this account."
+                  ? `Unlimited readings with your ${user.membership.label}.`
                   : "Hold your question in mind as you draw."}
               </p>
             </section>
           </div>
           <SpreadSeoContent spread={spread} />
+          <SpreadReviewNote />
+          <SiteFooter
+            onOpenSpread={openSpread}
+            onGoHome={beginAtSpreads}
+            onOpenPaywall={() => setShowPaywall(true)}
+            onRoute={goRoute}
+          />
         </main>
       )}
 

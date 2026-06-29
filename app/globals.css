@@ -797,6 +797,38 @@ button {
   align-items: start;
 }
 
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: -2px 0 8px;
+  color: var(--soft);
+  font-size: 14px;
+}
+
+.breadcrumb button {
+  border: 0;
+  background: transparent;
+  color: var(--soft);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+
+.breadcrumb button:hover {
+  color: var(--ink);
+}
+
+.breadcrumb span {
+  color: rgba(29, 28, 31, 0.24);
+}
+
+.breadcrumb strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
 .layout-panel {
   min-height: 440px;
   padding: 26px;
@@ -844,6 +876,28 @@ button {
   font-size: 46px;
   font-weight: 500;
   line-height: 1.05;
+}
+
+.detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.detail-meta b {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 7px;
+  background: #fffbe8;
+  color: #a58d06;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .position-list {
@@ -1549,6 +1603,43 @@ button {
   line-height: 1.65;
 }
 
+.review-note {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 22px;
+  align-items: start;
+  margin: 72px 0 0;
+  border: 1px solid rgba(29, 28, 31, 0.07);
+  border-radius: 18px;
+  background: #fff;
+  padding: 24px 26px;
+  box-shadow: 0 12px 30px rgba(29, 28, 31, 0.035);
+}
+
+.review-mark {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #2a1f54;
+  color: var(--gold-bright);
+}
+
+.review-note h2 {
+  margin: 0 0 6px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.review-note p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
 .error {
   color: #a11811;
 }
@@ -2229,6 +2320,17 @@ button {
 
   .detail-grid {
     gap: 26px;
+  }
+
+  .breadcrumb {
+    margin-top: 0;
+  }
+
+  .review-note {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-top: 52px;
+    padding: 22px;
   }
 
   .spread-seo-hero {
