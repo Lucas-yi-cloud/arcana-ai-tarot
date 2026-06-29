@@ -367,6 +367,39 @@ function TarotImage({ card, reversed = false }: { card: TarotCard; reversed?: bo
   );
 }
 
+function ShuffleAnimation({ spread, question }: { spread: Spread; question: string }) {
+  const mode = question.trim() ? "Your question" : "A general reading";
+
+  return (
+    <div className="shuffle-scene" role="status" aria-live="polite">
+      <p className="shuffle-kicker">
+        {spread.name} · {mode}
+      </p>
+      <h1 className="serif">Focus on your question...</h1>
+      <div className="shuffle-dots" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="shuffle-deck" aria-hidden="true">
+        <div className="shuffle-glow" />
+        <div className="shuffle-card shuffle-card-left">
+          <CardBack />
+        </div>
+        <div className="shuffle-card shuffle-card-right">
+          <CardBack />
+        </div>
+        <div className="shuffle-card shuffle-card-main">
+          <CardBack />
+        </div>
+      </div>
+      <div className="shuffle-progress" aria-hidden="true">
+        <span />
+      </div>
+    </div>
+  );
+}
+
 function getSynthesis(cards: DrawnCard[], question: string, spread: Spread) {
   if (!cards.length) return "";
   const first = cards[0];
@@ -1251,7 +1284,7 @@ export default function TarotApp({
     window.setTimeout(() => {
       setCards(drawCards(spread));
       setDrawPhase("dealt");
-    }, 1200);
+    }, 1800);
   }
 
   async function revealReading() {
@@ -1764,25 +1797,20 @@ export default function TarotApp({
       )}
 
       {route === "draw" && (
-        <main className="page">
-          <section className="stage starfield" style={{ padding: 28 }}>
-            <h1 className="serif" style={{ margin: 0, fontSize: 38, fontWeight: 500 }}>
-              {drawPhase === "shuffling"
-                ? "Shuffling the deck..."
-                : cards.every((card) => card.flipped)
+        drawPhase === "shuffling" ? (
+          <main className="shuffle-page starfield">
+            <ShuffleAnimation spread={spread} question={question} />
+          </main>
+        ) : (
+          <main className="page">
+            <section className="stage starfield" style={{ padding: 28 }}>
+              <h1 className="serif" style={{ margin: 0, fontSize: 38, fontWeight: 500 }}>
+                {cards.every((card) => card.flipped)
                   ? "All cards revealed"
                   : "Tap each card to reveal"}
-            </h1>
-            <div className="draw-board">
-              {drawPhase === "shuffling" && (
-                <div style={{ display: "grid", placeItems: "center", height: "100%" }}>
-                  <div style={{ width: 96, height: 154, animation: "tarot-float 1.2s ease-in-out infinite" }}>
-                    <CardBack />
-                  </div>
-                </div>
-              )}
-              {drawPhase === "dealt" &&
-                cards.map((card, index) => (
+              </h1>
+              <div className="draw-board">
+                {cards.map((card, index) => (
                   <div
                     className="draw-slot"
                     key={card.key}
@@ -1815,8 +1843,7 @@ export default function TarotApp({
                     </button>
                   </div>
                 ))}
-            </div>
-            {drawPhase === "dealt" && (
+              </div>
               <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
                 {!cards.every((card) => card.flipped) && (
                   <button
@@ -1838,9 +1865,9 @@ export default function TarotApp({
                   </button>
                 )}
               </div>
-            )}
-          </section>
-        </main>
+            </section>
+          </main>
+        )
       )}
 
       {route === "result" && (
