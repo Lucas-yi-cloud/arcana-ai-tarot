@@ -1929,6 +1929,18 @@ button {
   margin: 0 0 14px;
 }
 
+.seo-copy.seo-copy-centered h2 {
+  margin-right: auto;
+  margin-left: auto;
+  text-align: center;
+}
+
+.seo-copy.seo-copy-centered p {
+  margin-right: auto;
+  margin-left: auto;
+  text-align: center;
+}
+
 .seo-ritual-panel {
   position: relative;
   display: grid;
