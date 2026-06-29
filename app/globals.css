@@ -2005,7 +2005,6 @@ button {
   .spread-seo-step-grid,
   .spread-seo-scenario-grid,
   .seo-intro,
-  .seo-ritual-panel,
   .seo-stat-band,
   .seo-feature-row,
   .footer-grid {
@@ -2013,16 +2012,16 @@ button {
   }
 
   .seo-ritual-panel {
+    gap: 28px;
     padding: 42px 28px;
   }
 
   .seo-ritual-cards {
-    min-height: 248px;
-    order: 2;
+    height: 226px;
   }
 
   .seo-ritual-copy {
-    order: 1;
+    align-self: center;
   }
 
   .detail-grid {
@@ -2116,11 +2115,18 @@ button {
   }
 
   .seo-ritual-panel {
+    grid-template-columns: 1fr;
     padding: 32px 22px;
   }
 
   .seo-ritual-cards {
+    order: 1;
+    min-height: 218px;
     transform: scale(0.86);
     transform-origin: center top;
+  }
+
+  .seo-ritual-copy {
+    order: 2;
   }
 }
