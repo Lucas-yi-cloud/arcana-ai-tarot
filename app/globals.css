@@ -2565,10 +2565,35 @@ button {
 }
 
 @media (max-width: 560px) {
-  .purple-pill span,
   .nav-signin span,
   .pro-pill span:nth-of-type(3) {
     display: none;
+  }
+
+  .purple-pill {
+    gap: 6px;
+    padding: 8px 13px;
+    border: 1px solid var(--purple-dark);
+    background: #1f1736;
+  }
+
+  .purple-pill span:first-child {
+    display: inline;
+  }
+
+  .purple-pill span:nth-child(2) {
+    overflow: hidden;
+    width: 28px;
+    color: transparent;
+    white-space: nowrap;
+  }
+
+  .purple-pill span:nth-child(2)::before {
+    content: "PRO";
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0;
   }
 
   .account-actions {
