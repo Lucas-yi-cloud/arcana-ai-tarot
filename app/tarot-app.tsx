@@ -256,16 +256,6 @@ function setMetaByProperty(property: string, content: string) {
   element.content = content;
 }
 
-function setCanonical(href: string) {
-  let element = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-  if (!element) {
-    element = document.createElement("link");
-    element.rel = "canonical";
-    document.head.appendChild(element);
-  }
-  element.href = href;
-}
-
 function syncDocumentMeta(spread: Spread | null) {
   if (typeof document === "undefined") return;
 
@@ -286,7 +276,6 @@ function syncDocumentMeta(spread: Spread | null) {
 
   document.title = title;
   setMetaByName("description", description);
-  setCanonical(url);
   setMetaByProperty("og:title", title);
   setMetaByProperty("og:description", description);
   setMetaByProperty("og:url", url);
