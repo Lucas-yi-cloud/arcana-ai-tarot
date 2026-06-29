@@ -2021,34 +2021,59 @@ export default function TarotApp({
       )}
 
       {route === "result" && (
-        <main className="page">
-          <button className="text-btn" onClick={goHome}>
-            ‹ New reading
-          </button>
-          <section className="result-panel" style={{ marginTop: 20 }}>
-            <h1 className="serif" style={{ margin: 0, fontSize: 38, fontWeight: 500 }}>
-              {spread.name}
-            </h1>
-            <p className="serif" style={{ color: "#3b2a6c", fontSize: 24, marginTop: 8 }}>
+        <main className="page result-page">
+          <section className="result-heading">
+            <button className="result-back" onClick={goHome}>
+              ‹ <span>Spreads</span>
+            </button>
+            <p>{spread.name}</p>
+            <h1 className="serif">
               {question.trim() ? `“${question.trim()}”` : "General reading"}
-            </p>
+            </h1>
+          </section>
+
+          <section className="result-stage stage starfield" aria-label={`${spread.name} result cards`}>
+            <div className="result-stage-board">
+              {cards.map((card) => (
+                <div
+                  className="result-stage-slot"
+                  key={card.key}
+                  style={{
+                    left: `${card.x}%`,
+                    top: `${card.y}%`,
+                    transform: `translate(-50%, -50%) rotate(${card.rot ?? 0}deg) scale(${
+                      spread.count >= 10 ? 0.54 : spread.count >= 6 ? 0.72 : spread.count >= 5 ? 0.82 : 1
+                    })`,
+                  }}
+                >
+                  <div className="result-stage-card">
+                    <TarotImage card={card} reversed={card.reversed} />
+                  </div>
+                  <span>{card.posLabel}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="card-reading-section">
+            <span className="result-kicker">CARD BY CARD</span>
             <div className="result-list">
               {cards.map((card) => {
                 const keywords = card.reversed ? card.rev : card.up;
                 return (
                   <article className="result-card" key={card.key}>
-                    <div style={{ width: 74, height: 118 }}>
+                    <div className="result-card-image">
                       <TarotImage card={card} reversed={card.reversed} />
                     </div>
-                    <div>
-                      <span className="tag">{card.posLabel}</span>
-                      <h3 style={{ margin: "8px 0 4px" }}>
-                        {card.name}{" "}
-                        <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 14 }}>
-                          · {card.reversed ? "Reversed" : "Upright"}
+                    <div className="result-card-copy">
+                      <div className="result-card-title">
+                        <span className="tag">{card.posLabel}</span>
+                        <h2>{card.name}</h2>
+                        <span className={`orientation-chip ${card.reversed ? "reversed" : "upright"}`}>
+                          {card.reversed ? "Reversed" : "Upright"}
                         </span>
-                      </h3>
-                      <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.5 }}>
+                      </div>
+                      <p>
                         {card.interpretation ??
                           `${keywords[0]}, ${keywords[1]}. In this position, it points toward ${keywords[2]}.`}
                       </p>
@@ -2057,21 +2082,49 @@ export default function TarotApp({
                 );
               })}
             </div>
-            <div className="synthesis">
-              <span className="tag">THE READING</span>
-              <p className="serif" style={{ margin: "12px 0 0", fontSize: 22, lineHeight: 1.45 }}>
-                {aiSynthesis || synthesis}
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
-              <button className="primary-btn" disabled={saving} onClick={() => void saveReading()}>
-                {saving ? "Saving..." : "Save to journal"}
-              </button>
-              <button className="secondary-btn" onClick={goHome}>
-                New reading
-              </button>
-            </div>
           </section>
+
+          <section className="result-reading-panel">
+            <div className="result-reading-label">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 3l2.45 6.55L21 12l-6.55 2.45L12 21l-2.45-6.55L3 12l6.55-2.45L12 3z" />
+              </svg>
+              <span>THE READING</span>
+            </div>
+            <p className="serif">{aiSynthesis || synthesis}</p>
+          </section>
+
+          <div className="result-actions">
+            <button className="primary-btn" disabled={saving} onClick={() => void saveReading()}>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z" />
+              </svg>
+              {saving ? "Saving..." : "Save to journal"}
+            </button>
+            <button className="secondary-btn" onClick={goHome}>
+              New reading
+            </button>
+          </div>
         </main>
       )}
 

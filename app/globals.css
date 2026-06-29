@@ -1172,20 +1172,139 @@ button {
   height: 100%;
 }
 
+.result-page {
+  max-width: 860px;
+}
+
+.result-heading {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 0 0 30px;
+  text-align: center;
+}
+
+.result-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--soft);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+}
+
+.result-back:hover {
+  color: var(--ink);
+}
+
+.result-heading p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+
+.result-heading h1 {
+  max-width: 760px;
+  margin: 0;
+  color: #3b2a6c;
+  font-size: 30px;
+  font-style: italic;
+  font-weight: 500;
+  line-height: 1.18;
+}
+
+.result-stage {
+  min-height: 348px;
+  border-radius: 20px;
+  padding: 28px 30px;
+}
+
+.result-stage-board {
+  position: relative;
+  height: 292px;
+}
+
+.result-stage-slot {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  transform-origin: center center;
+}
+
+.result-stage-card {
+  width: 108px;
+  height: 174px;
+}
+
+.result-stage-slot span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.card-reading-section {
+  margin-top: 36px;
+}
+
+.result-kicker,
+.result-reading-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
 .result-list {
   display: grid;
-  gap: 14px;
+  gap: 18px;
+  margin-top: 16px;
 }
 
 .result-card {
   display: grid;
   grid-template-columns: 74px 1fr;
-  gap: 16px;
+  gap: 20px;
+  align-items: start;
+}
+
+.result-card-image {
+  width: 74px;
+  height: 118px;
+}
+
+.result-card-copy {
+  min-width: 0;
+  padding-top: 5px;
+}
+
+.result-card-title {
+  display: flex;
   align-items: center;
-  padding: 14px;
-  border: 1px solid rgba(29, 28, 31, 0.08);
-  border-radius: 18px;
-  background: #fff;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.result-card-title h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.result-card-copy p {
+  margin: 0;
+  color: #3a3940;
+  font-size: 16px;
+  line-height: 1.62;
 }
 
 .tag {
@@ -1201,12 +1320,57 @@ button {
   letter-spacing: 0.04em;
 }
 
-.synthesis {
-  margin-top: 18px;
-  padding: 20px;
+.orientation-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.orientation-chip.reversed {
+  background: #ffe8e8;
+  color: #ca1e2c;
+}
+
+.orientation-chip.upright {
+  background: #e9f9ef;
+  color: #21824c;
+}
+
+.result-reading-panel {
+  margin-top: 42px;
+  padding: 28px 30px;
   border: 1px solid #e1daf7;
   border-radius: 18px;
-  background: linear-gradient(135deg, #f7f5fd, #f1eefc);
+  background: #f5f1ff;
+}
+
+.result-reading-label {
+  color: var(--purple);
+}
+
+.result-reading-panel p {
+  margin: 16px 0 0;
+  color: #2a1f54;
+  font-size: 24px;
+  line-height: 1.55;
+}
+
+.result-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 26px;
+}
+
+.result-actions .primary-btn,
+.result-actions .secondary-btn {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 16px;
 }
 
 .modal-backdrop {
@@ -2350,6 +2514,20 @@ button {
     height: 420px;
   }
 
+  .result-stage {
+    min-height: 300px;
+    padding: 24px 18px;
+  }
+
+  .result-stage-board {
+    height: 244px;
+  }
+
+  .result-stage-card {
+    width: 86px;
+    height: 138px;
+  }
+
   .site-footer {
     padding: 42px 28px 26px;
   }
@@ -2383,9 +2561,73 @@ button {
   }
 
   .reading-panel,
-  .auth-panel,
-  .result-panel {
+  .auth-panel {
     padding: 22px;
+  }
+
+  .result-page {
+    padding-top: 22px;
+  }
+
+  .result-heading {
+    margin-bottom: 22px;
+  }
+
+  .result-heading h1 {
+    font-size: 26px;
+  }
+
+  .result-stage {
+    min-height: 244px;
+    border-radius: 16px;
+    padding: 18px 12px;
+  }
+
+  .result-stage-board {
+    height: 206px;
+  }
+
+  .result-stage-card {
+    width: 64px;
+    height: 102px;
+  }
+
+  .result-stage-slot span {
+    font-size: 11px;
+  }
+
+  .result-card {
+    grid-template-columns: 58px 1fr;
+    gap: 14px;
+  }
+
+  .result-card-image {
+    width: 58px;
+    height: 92px;
+  }
+
+  .result-card-title {
+    gap: 7px;
+  }
+
+  .result-card-title h2 {
+    font-size: 16px;
+  }
+
+  .result-card-copy p {
+    font-size: 14.5px;
+  }
+
+  .result-reading-panel {
+    padding: 22px;
+  }
+
+  .result-reading-panel p {
+    font-size: 21px;
+  }
+
+  .result-actions {
+    grid-template-columns: 1fr;
   }
 
   .pillar-grid,
