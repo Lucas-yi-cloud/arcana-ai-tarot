@@ -1,4 +1,4 @@
-import { getAppEnv } from "@/lib/env";
+import { getAppEnv, requireEnv } from "@/lib/env";
 import { isValidStripeSignature } from "@/lib/stripe-signature";
 
 /**

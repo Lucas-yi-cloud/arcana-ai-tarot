@@ -49,6 +49,10 @@ declare module "next/server" {
   export function userAgentFromString(input: string | undefined): unknown;
 }
 
+declare module "next/navigation" {
+  export function notFound(): never;
+}
+
 declare module "cloudflare:workers" {
   type CloudflareEnv = {
     DB?: D1Database;
