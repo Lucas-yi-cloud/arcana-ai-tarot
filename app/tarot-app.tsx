@@ -596,6 +596,135 @@ function SeoSection({
   );
 }
 
+function SpreadSeoContent({ spread }: { spread: Spread }) {
+  const seo = spreadSeoMeta[spread.id];
+  if (!seo) return null;
+
+  const steps = [
+    {
+      title: "Hold your question",
+      copy: "Settle on what you want to understand. A focused intention gives the cards something clear to reflect.",
+    },
+    {
+      title: "Draw the cards",
+      copy: "Shuffle and reveal each card yourself. Every position in this spread has a named, specific meaning.",
+    },
+    {
+      title: "Read the whole story",
+      copy: "Arcana AI interprets the cards together — in context with each other and your question — not as isolated meanings.",
+    },
+  ];
+  const faqJson = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: seo.faq.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.a,
+      },
+    })),
+  };
+
+  return (
+    <section className="spread-seo-content" aria-labelledby="spread-seo-heading">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJson) }}
+      />
+      <div className="spread-seo-hero">
+        <div className="spread-seo-copy">
+          <span>ABOUT THIS SPREAD</span>
+          <h2 className="serif" id="spread-seo-heading">
+            {seo.h}
+          </h2>
+          <p>{seo.p1}</p>
+          <p>{seo.p2}</p>
+        </div>
+        <figure className="spread-seo-diagram starfield">
+          <span>SPREAD STRUCTURE</span>
+          <div className="spread-seo-layout" aria-hidden="true">
+            {spread.positions.map((position, index) => {
+              const card = deck[index % deck.length];
+              return (
+                <div
+                  className="spread-seo-card"
+                  key={`${spread.id}-${position.label}-seo`}
+                  style={{
+                    left: `${position.x}%`,
+                    top: `${position.y}%`,
+                    transform: `translate(-50%, -50%) rotate(${position.rot ?? 0}deg) scale(${
+                      spread.count >= 10 ? 0.48 : spread.count >= 6 ? 0.66 : spread.count >= 5 ? 0.74 : 0.92
+                    })`,
+                  }}
+                >
+                  <img alt="" src={cardImage(card.num, card.name)} loading="lazy" />
+                </div>
+              );
+            })}
+          </div>
+          <figcaption>
+            {spread.name} · {spread.count} {spread.count === 1 ? "card" : "cards"} layout
+          </figcaption>
+        </figure>
+      </div>
+
+      <div className="spread-seo-steps">
+        <h2 className="serif">How a {spread.name} reading works</h2>
+        <div className="spread-seo-step-grid">
+          {steps.map((step, index) => (
+            <article className="spread-seo-step" key={step.title}>
+              <b>{index + 1}</b>
+              <h3>{step.title}</h3>
+              <p>{step.copy}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="spread-seo-scenarios">
+        <h2 className="serif">When to use this spread</h2>
+        <div className="spread-seo-scenario-grid">
+          {seo.scenarios.map((scenario) => (
+            <article key={scenario.t}>
+              <h3>{scenario.t}</h3>
+              <p>{scenario.d}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="spread-seo-faq">
+        <h2 className="serif">{spread.name} questions, answered</h2>
+        <div className="spread-seo-faq-list">
+          {seo.faq.map((item) => (
+            <details key={item.q}>
+              <summary>
+                <span>{item.q}</span>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </summary>
+              <p>{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SiteFooter({
   onOpenSpread,
   onGoHome,
@@ -1591,6 +1720,7 @@ export default function TarotApp({
               </p>
             </section>
           </div>
+          <SpreadSeoContent spread={spread} />
         </main>
       )}
 
