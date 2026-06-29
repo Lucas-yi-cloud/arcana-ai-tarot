@@ -282,7 +282,7 @@ function syncDocumentMeta(spread: Spread | null) {
       )
     : siteDescription;
   const url = spread ? `${siteBaseUrl}/spread/${spread.id}` : `${siteBaseUrl}/`;
-  const image = seo ? cardImage(seo.cardNum, seo.cardName) : siteImage;
+  const image = seo ? `${siteBaseUrl}${cardImage(seo.cardNum, seo.cardName)}` : siteImage;
 
   document.title = title;
   setMetaByName("description", description);
@@ -1449,7 +1449,7 @@ export default function TarotApp({
             className={`nav-pill ${route === "history" ? "active" : ""}`}
             onClick={() => setRoute("history")}
           >
-            Readings
+            Journals
           </button>
         </div>
         <div className="account-actions">
@@ -1558,7 +1558,7 @@ export default function TarotApp({
                     boxShadow: "0 0 8px var(--gold-bright)",
                   }}
                 />
-                AI-GUIDED TAROT
+                PRO TAROT READING
               </div>
               <h1 className="serif">
                 Ask the cards<span style={{ color: "#cdbff0" }}>.</span>

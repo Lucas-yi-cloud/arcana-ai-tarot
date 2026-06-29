@@ -37,13 +37,13 @@ test("each spread declares as many positions as its card count", () => {
   }
 });
 
-test("cardImage builds the Wikimedia Rider-Waite URL", () => {
+test("cardImage builds the local Rider-Waite asset URL", () => {
   assert.equal(
     cardImage("00", "The Fool"),
-    "https://commons.wikimedia.org/wiki/Special:FilePath/RWS_Tarot_00_Fool.jpg"
+    "/assets/tarot/RWS_Tarot_00_Fool.jpg"
   );
   assert.equal(
     cardImage("10", "Wheel of Fortune"),
-    "https://commons.wikimedia.org/wiki/Special:FilePath/RWS_Tarot_10_Wheel_of_Fortune.jpg"
+    "/assets/tarot/RWS_Tarot_10_Wheel_of_Fortune.jpg"
   );
 });
