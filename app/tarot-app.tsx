@@ -448,6 +448,31 @@ function TarotImage({ card, reversed = false }: { card: TarotCard; reversed?: bo
   );
 }
 
+function splitReadingParagraphs(text: string) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function ReadingParagraphs({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
+  const paragraphs = splitReadingParagraphs(text);
+  return (
+    <div className={className}>
+      {paragraphs.map((paragraph, index) => (
+        <p key={`${paragraph.slice(0, 28)}-${index}`}>{paragraph}</p>
+      ))}
+    </div>
+  );
+}
+
 function ShuffleAnimation({ spread, question }: { spread: Spread; question: string }) {
   const mode = question.trim() ? "Your question" : "A general reading";
 
@@ -2073,10 +2098,13 @@ export default function TarotApp({
                           {card.reversed ? "Reversed" : "Upright"}
                         </span>
                       </div>
-                      <p>
-                        {card.interpretation ??
-                          `${keywords[0]}, ${keywords[1]}. In this position, it points toward ${keywords[2]}.`}
-                      </p>
+                      <ReadingParagraphs
+                        className="reading-copy"
+                        text={
+                          card.interpretation ??
+                          `${keywords[0]}, ${keywords[1]}. In this position, it points toward ${keywords[2]}.`
+                        }
+                      />
                     </div>
                   </article>
                 );
@@ -2101,7 +2129,7 @@ export default function TarotApp({
               </svg>
               <span>THE READING</span>
             </div>
-            <p className="serif">{aiSynthesis || synthesis}</p>
+            <ReadingParagraphs className="reading-synthesis serif" text={aiSynthesis || synthesis} />
           </section>
 
           <div className="result-actions">

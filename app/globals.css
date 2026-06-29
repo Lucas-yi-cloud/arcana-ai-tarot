@@ -1307,6 +1307,10 @@ button {
   line-height: 1.62;
 }
 
+.reading-copy p + p {
+  margin-top: 8px;
+}
+
 .tag {
   display: inline-flex;
   align-items: center;
@@ -1352,11 +1356,15 @@ button {
   color: var(--purple);
 }
 
-.result-reading-panel p {
+.reading-synthesis p {
   margin: 16px 0 0;
   color: #2a1f54;
   font-size: 24px;
   line-height: 1.55;
+}
+
+.reading-synthesis p + p {
+  margin-top: 18px;
 }
 
 .result-actions {
@@ -2622,7 +2630,7 @@ button {
     padding: 22px;
   }
 
-  .result-reading-panel p {
+  .reading-synthesis p {
     font-size: 21px;
   }
 

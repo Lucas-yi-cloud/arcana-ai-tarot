@@ -53,9 +53,12 @@ const SYSTEM_PROMPT = [
   "Write warmly and directly to the seeker in the second person ('you').",
   "Ground every card in its traditional upright or reversed meaning, its named spread position and that position's description, the seeker's question when given, and the pattern formed by the surrounding cards.",
   "Be specific, grounded, and non-repetitive; avoid vague platitudes such as 'trust your intuition' unless they are tied to a specific card and position.",
+  "Write nuanced, readable prose with a calm human rhythm: concrete, emotionally precise, and easy to sit with.",
   "Do not claim certainty about the future, and do not claim to know another person's private thoughts.",
   "Do not give medical, legal, financial, or mental-health directives. For career and money readings give reflective guidance and gentle next steps, not professional advice; for relationship readings describe dynamics and choices, not guaranteed feelings or outcomes.",
-  "Keep each card interpretation to 2-3 sentences, and the final synthesis to 3-5 sentences that tie the cards into one coherent message.",
+  "Each card interpretation must be 2 short paragraphs separated by a blank line. The first paragraph should explain the card through its position; the second should connect that position to the seeker's question with one reflective cue.",
+  "The final synthesis must be 3 short paragraphs separated by blank lines. Paragraph 1 names the whole arc of the spread, paragraph 2 names the main tension or lesson, and paragraph 3 offers grounded encouragement or a next step.",
+  "Inside JSON string values, represent paragraph breaks as escaped newlines: \\n\\n. Never compress the reading into one long paragraph.",
   "Respond with a single minified JSON object only — no markdown, no code fences, no commentary.",
 ].join(" ");
 
@@ -132,9 +135,45 @@ function buildUserPrompt(spread: Spread, question: string, cards: DrawInput[]) {
     "Spread-specific reading lens:",
     lensFor(spread.id),
     "",
-    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<2-3 sentences>"}],"synthesis":"<3-5 sentences>"}.',
+    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"<paragraph 1>\\n\\n<paragraph 2>\\n\\n<paragraph 3>"}.',
     "There must be exactly one cards entry per drawn card, in the same order.",
+    "Every interpretation and synthesis string must contain visible paragraph breaks using \\n\\n.",
   ].join("\n");
+}
+
+function normalizeParagraphBreaks(text: string) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function sentenceChunks(text: string) {
+  return normalizeParagraphBreaks(text)
+    .replace(/\s+/g, " ")
+    .match(/[^.!?。！？]+[.!?。！？]+|[^.!?。！？]+$/g)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean) ?? [];
+}
+
+function ensureParagraphs(text: string, preferredParagraphs: number) {
+  const normalized = normalizeParagraphBreaks(text);
+  if (!normalized) return "";
+  if (/\n\s*\n/.test(normalized)) return normalized;
+
+  const sentences = sentenceChunks(normalized);
+  if (sentences.length <= 1) return normalized;
+
+  const targetCount = Math.min(preferredParagraphs, sentences.length);
+  const chunkSize = Math.ceil(sentences.length / targetCount);
+  const paragraphs: string[] = [];
+  for (let index = 0; index < sentences.length; index += chunkSize) {
+    paragraphs.push(sentences.slice(index, index + chunkSize).join(" "));
+  }
+  return paragraphs.join("\n\n");
 }
 
 /** Deterministic Rider-Waite reading used when the LLM is unavailable. */
@@ -148,7 +187,8 @@ export function deterministicInterpretation(
     const orient = orientation(card);
     const text =
       `In the ${card.posLabel.toLowerCase()} position, ${card.name} ${orient} speaks to ${words[0]} and ${words[1]}. ` +
-      `Here it points toward ${words[2]} — let that color how you read this part of your situation.`;
+      `This part of the spread is asking you to notice where ${words[0]} is already shaping the story.\n\n` +
+      `Here it points toward ${words[2]} — let that color how you read this part of your situation. Move gently, but do not ignore what this card is making visible.`;
     return {
       num: card.num,
       name: card.name,
@@ -169,9 +209,15 @@ export function deterministicInterpretation(
   let synthesis: string;
   if (spread.id === "yesno") {
     const positive = !first.reversed && ["sun", "star", "wheel", "heart"].includes(first.glyph);
-    synthesis = `${opener} The answer leans ${positive ? "yes" : "not yet"}. ${first.name} points to ${firstWord}, so the real message is less about force and more about timing.`;
+    synthesis =
+      `${opener} The answer leans ${positive ? "yes" : "not yet"}, but the useful part is the reason behind that answer.\n\n` +
+      `${first.name} points to ${firstWord}, so the real message is less about force and more about timing. Notice whether you are asking from clarity or from urgency.\n\n` +
+      "Let the card slow the question down enough for you to choose with steadier attention.";
   } else {
-    synthesis = `${opener} The reading begins with ${firstWord} and resolves toward ${lastWord}. ${spread.name} is asking you to notice how the first impulse can mature into the final card's lesson.`;
+    synthesis =
+      `${opener} The reading begins with ${firstWord} and resolves toward ${lastWord}, which gives the spread a clear emotional movement.\n\n` +
+      `${spread.name} is asking you to notice how the first impulse can mature into the final card's lesson. The cards are less interested in a fixed outcome than in the pattern you can now see.\n\n` +
+      "Take the next step from that pattern: name what is true, soften what is reactive, and let the reading become something practical rather than something to worry over.";
   }
 
   return { cards: cardOut, synthesis, model: FALLBACK_MODEL };
@@ -329,7 +375,8 @@ export async function interpretReading(
       userPrompt,
       "",
       "The previous response was missing or not valid JSON. Return the same reading again as a single valid JSON object only — no markdown, no code fences, no commentary —",
-      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<2-3 sentences>"}],"synthesis":"<3-5 sentences>"} with exactly ${cards.length} card entries in position order.`,
+      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"<paragraph 1>\\n\\n<paragraph 2>\\n\\n<paragraph 3>"} with exactly ${cards.length} card entries in position order.`,
+      "Every interpretation and synthesis string must contain paragraph breaks using \\n\\n.",
     ].join("\n");
     const retry = await call(repairPrompt);
     const retryParsed = retry ? extractJson(retry.text) : null;
@@ -347,7 +394,7 @@ export async function interpretReading(
     const text = parsed.cards?.[index]?.interpretation;
     const safe =
       typeof text === "string" && text.trim()
-        ? text.trim()
+        ? ensureParagraphs(text, 2)
         : deterministicInterpretation(spread, question, [card]).cards[0].text;
     return {
       num: card.num,
@@ -358,5 +405,9 @@ export async function interpretReading(
     };
   });
 
-  return { cards: cardOut, synthesis: (parsed.synthesis ?? "").trim(), model: result.model };
+  return {
+    cards: cardOut,
+    synthesis: ensureParagraphs(parsed.synthesis ?? "", 3),
+    model: result.model,
+  };
 }
