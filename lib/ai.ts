@@ -51,13 +51,17 @@ const SYSTEM_PROMPT = [
   "You are Arcana AI, a thoughtful tarot reader working with the Rider-Waite-Smith Major Arcana.",
   "Treat tarot as a mirror for reflection, not fixed prediction or fortune-telling.",
   "Write warmly and directly to the seeker in the second person ('you').",
-  "Ground every card in its traditional upright or reversed meaning, its named spread position and that position's description, the seeker's question when given, and the pattern formed by the surrounding cards.",
-  "Be specific, grounded, and non-repetitive; avoid vague platitudes such as 'trust your intuition' unless they are tied to a specific card and position.",
+  "Before writing, silently identify the seeker's exact question focus: topic, time horizon, decision point, fear or hope, and what a useful answer must clarify.",
+  "Use that question focus as the anchor for every paragraph. Reuse concrete nouns, dates, domains, choices, or risks from the question where natural.",
+  "Ground every card in its traditional upright or reversed meaning, its named spread position and that position's description, the seeker's exact question when given, and the pattern formed by the surrounding cards.",
+  "Do not write generic card meanings. Translate each card into what it says about this specific question in this specific position.",
+  "Be specific, grounded, and non-repetitive; avoid vague platitudes such as 'trust your intuition' unless they are tied to a specific card, position, and detail from the question.",
   "Write nuanced, readable prose with a calm human rhythm: concrete, emotionally precise, and easy to sit with.",
-  "Do not claim certainty about the future, and do not claim to know another person's private thoughts.",
+  "Do not claim certainty about the future, guarantee safety, or claim to know another person's private thoughts.",
   "Do not give medical, legal, financial, or mental-health directives. For career and money readings give reflective guidance and gentle next steps, not professional advice; for relationship readings describe dynamics and choices, not guaranteed feelings or outcomes.",
-  "Each card interpretation must be 2 short paragraphs separated by a blank line. The first paragraph should explain the card through its position; the second should connect that position to the seeker's question with one reflective cue.",
-  "The final synthesis must be 3 short paragraphs separated by blank lines. Paragraph 1 names the whole arc of the spread, paragraph 2 names the main tension or lesson, and paragraph 3 offers grounded encouragement or a next step.",
+  "For yes/no readings, give a clear but non-absolute verdict: yes, no, likely, not yet, or unclear — plus the condition that changes or supports that answer.",
+  "Each card interpretation must be 2 short paragraphs separated by a blank line. The first paragraph should explain the card through its position; the second should connect that position directly to the seeker's question with one reflective cue.",
+  "The final synthesis must be 3 short paragraphs separated by blank lines. Paragraph 1 directly answers the exact question with nuance, paragraph 2 explains why the cards point that way, and paragraph 3 offers grounded encouragement or a next step.",
   "Inside JSON string values, represent paragraph breaks as escaped newlines: \\n\\n. Never compress the reading into one long paragraph.",
   "Respond with a single minified JSON object only — no markdown, no code fences, no commentary.",
 ].join(" ");
@@ -112,6 +116,38 @@ function keywords(card: DrawInput) {
   return card.reversed ? card.rev : card.up;
 }
 
+function questionBindingProtocol(spread: Spread, trimmedQuestion: string) {
+  if (!trimmedQuestion) {
+    return [
+      "Question binding protocol:",
+      "- The seeker did not write a specific question, so read for their current season without inventing a hidden question.",
+      "- Keep each card tied to its spread position, and make the synthesis name the broad pattern instead of pretending to answer something private.",
+    ].join("\n");
+  }
+
+  const yesNoRule =
+    spread.id === "yesno"
+      ? [
+          "- Because this is a Yes / No spread, synthesis paragraph 1 must begin with a verdict for the exact question: 'This leans [yes/no/likely/not yet/unclear] — [condition].'",
+          "- Explain the condition through the card's orientation and traditional theme; do not turn the answer into a broad horoscope.",
+        ]
+      : [
+          "- Synthesis paragraph 1 must answer the exact question in plain language before widening into nuance.",
+          "- Synthesis paragraph 2 must cite at least two concrete anchors from the spread: card names, positions, orientation, or position descriptions.",
+        ];
+
+  return [
+    "Question binding protocol:",
+    `- The reading must respond to this exact question: "${trimmedQuestion}".`,
+    "- Silently infer the domain, time horizon, decision point, and emotional stake before writing.",
+    "- Use the seeker's nouns and timeframe naturally; do not replace them with vague phrases like 'your situation' for the whole answer.",
+    "- If the question asks about safety, health, money, legal matters, love guarantees, or future certainty, frame the answer as reflective signals, conditions, and practical care. Do not guarantee outcomes.",
+    "- Every card paragraph must pass this test: could a reader see why this card matters to this exact question and this named position?",
+    ...yesNoRule,
+    "- Delete any sentence that could fit almost any tarot reading without changing.",
+  ].join("\n");
+}
+
 function buildUserPrompt(spread: Spread, question: string, cards: DrawInput[]) {
   const trimmed = question.trim();
   const cardLines = cards
@@ -127,13 +163,20 @@ function buildUserPrompt(spread: Spread, question: string, cards: DrawInput[]) {
 
   return [
     `Spread: ${spread.name} — ${spread.blurb}`,
-    trimmed ? `Seeker's question: "${trimmed}"` : "The seeker did not provide a specific question; read for the season they are in.",
+    trimmed ? `Exact seeker question: "${trimmed}"` : "The seeker did not provide a specific question; read for the season they are in.",
     "",
     "Cards drawn (in position order):",
     cardLines,
     "",
     "Spread-specific reading lens:",
     lensFor(spread.id),
+    "",
+    questionBindingProtocol(spread, trimmed),
+    "",
+    "Answer quality checklist:",
+    "- The synthesis should not merely summarize card meanings; it must answer the seeker's actual question.",
+    "- The reading should name what the cards make more visible, what remains conditional, and what the seeker can do next.",
+    "- Avoid absolute promises, fatalistic predictions, and unsupported certainty.",
     "",
     'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"<paragraph 1>\\n\\n<paragraph 2>\\n\\n<paragraph 3>"}.',
     "There must be exactly one cards entry per drawn card, in the same order.",
@@ -182,13 +225,15 @@ export function deterministicInterpretation(
   question: string,
   cards: DrawInput[]
 ): ReadingInterpretation {
+  const trimmedQuestion = question.trim();
+  const focus = trimmedQuestion ? `your question — "${trimmedQuestion}"` : "this open reading";
   const cardOut: CardInterpretation[] = cards.map((card) => {
     const words = keywords(card);
     const orient = orientation(card);
     const text =
-      `In the ${card.posLabel.toLowerCase()} position, ${card.name} ${orient} speaks to ${words[0]} and ${words[1]}. ` +
-      `This part of the spread is asking you to notice where ${words[0]} is already shaping the story.\n\n` +
-      `Here it points toward ${words[2]} — let that color how you read this part of your situation. Move gently, but do not ignore what this card is making visible.`;
+      `In the ${card.posLabel.toLowerCase()} position, ${card.name} ${orient} speaks to ${words[0]} and ${words[1]} as they relate to ${focus}. ` +
+      `This card is less a fixed prediction than a lens on what this part of the question is asking you to notice.\n\n` +
+      `The useful cue is ${words[2]}: bring that into the question directly, and ask where it clarifies the next honest step instead of turning the card into a generic omen.`;
     return {
       num: card.num,
       name: card.name,
@@ -202,22 +247,22 @@ export function deterministicInterpretation(
   const last = cards[cards.length - 1];
   const firstWord = keywords(first)[0];
   const lastWord = keywords(last)[0];
-  const opener = question.trim()
-    ? `On "${question.trim()}", the deck answers in layers.`
+  const opener = trimmedQuestion
+    ? `On "${trimmedQuestion}", the deck answers in layers rather than with a guarantee.`
     : "Without a fixed question, the cards read the season you are in.";
 
   let synthesis: string;
   if (spread.id === "yesno") {
     const positive = !first.reversed && ["sun", "star", "wheel", "heart"].includes(first.glyph);
     synthesis =
-      `${opener} The answer leans ${positive ? "yes" : "not yet"}, but the useful part is the reason behind that answer.\n\n` +
-      `${first.name} points to ${firstWord}, so the real message is less about force and more about timing. Notice whether you are asking from clarity or from urgency.\n\n` +
-      "Let the card slow the question down enough for you to choose with steadier attention.";
+      `${opener} This leans ${positive ? "yes" : "not yet"} — if you work with the condition the card is showing instead of treating it as fate.\n\n` +
+      `${first.name} points to ${firstWord}, so the answer is shaped by that specific energy in relation to the question. Notice whether the card is describing support that is already present, or a missing piece that needs care first.\n\n` +
+      "Use the reading as a checkpoint: name the real concern inside the question, then choose the next step that makes that concern more manageable.";
   } else {
     synthesis =
       `${opener} The reading begins with ${firstWord} and resolves toward ${lastWord}, which gives the spread a clear emotional movement.\n\n` +
-      `${spread.name} is asking you to notice how the first impulse can mature into the final card's lesson. The cards are less interested in a fixed outcome than in the pattern you can now see.\n\n` +
-      "Take the next step from that pattern: name what is true, soften what is reactive, and let the reading become something practical rather than something to worry over.";
+      `${spread.name} is asking you to notice how the first impulse can mature into the final card's lesson in relation to ${focus}. The cards are less interested in a fixed outcome than in the pattern you can now see.\n\n` +
+      "Take the next step from that pattern: name what is true, separate what is conditional from what is known, and let the reading become something practical rather than something to worry over.";
   }
 
   return { cards: cardOut, synthesis, model: FALLBACK_MODEL };
