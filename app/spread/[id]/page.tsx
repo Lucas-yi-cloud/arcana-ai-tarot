@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import JsonLd from "@/app/json-ld";
 import TarotApp from "@/app/tarot-app";
 import { cardImage, spreads } from "@/lib/tarot-data";
 import {
-  clampSeoDescription,
   siteDescription,
   siteTitle,
   spreadSeoMeta,
 } from "@/lib/tarot-seo";
+import {
+  spreadDescription,
+  spreadStructuredData,
+  spreadTitle,
+} from "@/lib/structured-data";
 
 type SpreadPageProps = {
   params: Promise<{ id: string }>;
@@ -33,12 +38,8 @@ export async function generateMetadata({ params }: SpreadPageProps): Promise<Met
   }
 
   const seo = spreadSeoMeta[spread.id];
-  const title = `${spread.name} Tarot Reading — Free AI ${spread.name} Spread | Arcana AI`;
-  const description = clampSeoDescription(
-    `${spread.blurb} ${
-      seo?.p1 ?? `Ask a question and let Arcana AI read your ${spread.name} spread instantly.`
-    }`
-  );
+  const title = spreadTitle(spread);
+  const description = spreadDescription(spread);
   const url = `/spread/${spread.id}`;
   const image = seo ? cardImage(seo.cardNum, seo.cardName) : "/og-image.jpg";
 
@@ -68,5 +69,10 @@ export default async function SpreadPage({ params }: SpreadPageProps) {
   const spread = findSpread(id);
   if (!spread) notFound();
 
-  return <TarotApp initialRoute="detail" initialSpreadId={spread.id} />;
+  return (
+    <>
+      <JsonLd data={spreadStructuredData(spread)} />
+      <TarotApp initialRoute="detail" initialSpreadId={spread.id} />
+    </>
+  );
 }

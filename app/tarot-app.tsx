@@ -648,25 +648,8 @@ function SpreadSeoContent({ spread }: { spread: Spread }) {
       copy: "Arcana AI interprets the cards together — in context with each other and your question — not as isolated meanings.",
     },
   ];
-  const faqJson = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: seo.faq.map((item) => ({
-      "@type": "Question",
-      name: item.q,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: item.a,
-      },
-    })),
-  };
-
   return (
     <section className="spread-seo-content" aria-labelledby="spread-seo-heading">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJson) }}
-      />
       <div className="spread-seo-hero">
         <div className="spread-seo-copy">
           <span>ABOUT THIS SPREAD</span>

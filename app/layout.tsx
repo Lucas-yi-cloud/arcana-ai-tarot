@@ -52,19 +52,6 @@ export const metadata: Metadata = {
   },
 };
 
-const structuredData = {
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "Arcana AI Tarot",
-  alternateName: "AI Tarot Reading",
-  url: `${siteUrl}/`,
-  applicationCategory: "LifestyleApplication",
-  operatingSystem: "Web, iOS",
-  description:
-    "Get an AI tarot reading online. Ask a question, draw the Rider-Waite cards, and receive an AI-guided interpretation across 14 classic spreads.",
-  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -72,13 +59,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-        />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
