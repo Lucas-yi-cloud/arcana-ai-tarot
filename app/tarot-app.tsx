@@ -1686,7 +1686,8 @@ export default function TarotApp({
                 Ask the cards<span style={{ color: "#cdbff0" }}>.</span>
                 <br />
                 Hear what you
-                <br />
+                <br className="hero-break-desktop" />
+                {" "}
                 <span style={{ color: "#e0d8ff", fontStyle: "italic" }}>already know.</span>
               </h1>
               <p>
@@ -2163,6 +2164,70 @@ export default function TarotApp({
       {route === "privacy" && <PrivacyPage onBack={goHome} />}
 
       {route === "contact" && <ContactPage onBack={goHome} />}
+
+      <nav className="mobile-tabbar" aria-label="Mobile navigation">
+        <button className={route !== "history" ? "active" : ""} onClick={goHome}>
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="4" y="4" width="6" height="6" rx="1.2" />
+            <rect x="14" y="4" width="6" height="6" rx="1.2" />
+            <rect x="4" y="14" width="6" height="6" rx="1.2" />
+            <rect x="14" y="14" width="6" height="6" rx="1.2" />
+          </svg>
+          <span>Spreads</span>
+        </button>
+        <button className={route === "history" ? "active" : ""} onClick={() => goRoute("history")}>
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.6L6 20V5a1 1 0 0 1 1-1z" />
+          </svg>
+          <span>Journal</span>
+        </button>
+        <button
+          className={profileOpen || authOpen ? "active" : ""}
+          onClick={() => {
+            if (user) {
+              setProfileOpen((open) => !open);
+            } else {
+              setAuthOpen(true);
+            }
+          }}
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="8" r="3.4" />
+            <path d="M5.5 20a6.8 6.8 0 0 1 13 0" />
+          </svg>
+          <span>Account</span>
+        </button>
+      </nav>
 
       {authOpen && (
         <div className="modal-backdrop">
