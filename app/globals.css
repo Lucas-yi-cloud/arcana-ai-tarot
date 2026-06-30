@@ -1265,6 +1265,34 @@ button {
   font-weight: 700;
 }
 
+.answer-panel {
+  display: grid;
+  place-items: center;
+  min-height: 126px;
+  margin-top: 28px;
+  padding: 26px;
+  text-align: center;
+}
+
+.answer-panel span {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.answer-panel h2 {
+  position: relative;
+  z-index: 1;
+  margin: 12px 0 0;
+  color: #ffe98a;
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1.08;
+}
+
 .card-reading-section {
   margin-top: 36px;
 }
@@ -2798,6 +2826,16 @@ button {
   .result-stage-card {
     width: 64px;
     height: 102px;
+  }
+
+  .answer-panel {
+    min-height: 108px;
+    margin-top: 18px;
+    padding: 22px 18px;
+  }
+
+  .answer-panel h2 {
+    font-size: 32px;
   }
 
   .result-stage-slot span {

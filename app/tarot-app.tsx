@@ -560,6 +560,34 @@ function getSynthesis(cards: DrawnCard[], question: string, spread: Spread) {
   return `${opener} The reading begins with ${firstWord} and resolves toward ${lastWord}. ${spread.name} is asking you to notice how the first impulse can mature into the final card's lesson.`;
 }
 
+function getYesNoVerdict(card: DrawnCard | undefined) {
+  if (!card) return "";
+
+  const supportiveCards = new Set([
+    "The Fool",
+    "The Magician",
+    "The Empress",
+    "The Emperor",
+    "The Lovers",
+    "The Chariot",
+    "Strength",
+    "Wheel of Fortune",
+    "Temperance",
+    "The Star",
+    "The Sun",
+    "Judgement",
+    "The World",
+  ]);
+  const unclearCards = new Set(["The High Priestess", "The Hermit", "The Hanged Man", "The Moon"]);
+
+  if (card.reversed) {
+    return supportiveCards.has(card.name) ? "Not yet — realign first" : "No — pause first";
+  }
+  if (supportiveCards.has(card.name)) return "Likely — with care";
+  if (unclearCards.has(card.name)) return "Unclear — wait for more";
+  return "No — pause first";
+}
+
 function drawCards(spread: Spread) {
   const indexes = deck.map((_, index) => index);
   for (let i = indexes.length - 1; i > 0; i -= 1) {
@@ -2099,6 +2127,13 @@ export default function TarotApp({
               ))}
             </div>
           </section>
+
+          {spread.id === "yesno" && cards[0] && (
+            <section className="answer-panel stage starfield" aria-label="The answer">
+              <span>THE ANSWER</span>
+              <h2 className="serif">{getYesNoVerdict(cards[0])}</h2>
+            </section>
+          )}
 
           <section className="card-reading-section">
             <span className="result-kicker">CARD BY CARD</span>
