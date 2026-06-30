@@ -2582,29 +2582,48 @@ button {
     display: none;
   }
 
-  .purple-pill {
-    gap: 6px;
-    padding: 8px 13px;
-    border: 1px solid var(--purple-dark);
-    background: #1f1736;
+  .purple-pill,
+  .pro-pill {
+    gap: 5px;
+    min-width: 64px;
+    height: 32px;
+    justify-content: center;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 10px;
+    background: #7045d9;
+    box-shadow: 0 8px 18px rgba(100, 66, 192, 0.18);
+    color: #fff;
   }
 
-  .purple-pill span:first-child {
+  .purple-pill:hover,
+  .pro-pill:hover {
+    background: #6442c0;
+  }
+
+  .purple-pill span:first-child,
+  .pro-pill span:first-child {
     display: inline;
+    color: var(--gold-bright) !important;
+    font-size: 12px;
+    line-height: 1;
   }
 
-  .purple-pill span:nth-child(2) {
+  .purple-pill span:nth-child(2),
+  .pro-pill span:nth-child(2) {
     overflow: hidden;
-    width: 28px;
+    width: auto;
     color: transparent;
+    font-size: 0;
     white-space: nowrap;
   }
 
-  .purple-pill span:nth-child(2)::before {
-    content: "PRO";
+  .purple-pill span:nth-child(2)::before,
+  .pro-pill span:nth-child(2)::before {
+    content: "Pro";
     color: #fff;
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 750;
     letter-spacing: 0;
   }
 

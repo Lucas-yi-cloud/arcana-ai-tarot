@@ -1577,7 +1577,7 @@ export default function TarotApp({
         <div className="account-actions">
           {user?.subscribed ? (
             <div className="pro-pill">
-              <span style={{ color: "var(--gold-bright)" }}>↯</span>
+              <span style={{ color: "var(--gold-bright)" }}>⚡</span>
               <span style={{ color: "var(--gold-bright)" }}>PRO</span>
               <span style={{ color: "rgba(255,255,255,.62)", fontWeight: 600 }}>
                 {activeDays !== null ? `${activeDays}d left` : "Active"}
@@ -1585,7 +1585,7 @@ export default function TarotApp({
             </div>
           ) : (
             <button className="purple-pill" onClick={() => setShowPaywall(true)}>
-              <span style={{ color: "var(--gold-bright)" }}>↯</span>
+              <span style={{ color: "var(--gold-bright)" }}>⚡</span>
               <span>Go Unlimited</span>
             </button>
           )}
