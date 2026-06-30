@@ -65,7 +65,7 @@ export function homeStructuredData() {
       applicationCategory: "LifestyleApplication",
       operatingSystem: "Web",
       description:
-        "Get an AI tarot reading online. Ask a question, draw the Rider-Waite cards, and receive an AI-guided interpretation across 14 classic spreads.",
+        `Get an AI tarot reading online. Ask a question, draw the Rider-Waite cards, and receive an AI-guided interpretation across ${spreads.length} classic spreads.`,
       image: siteImage,
       isAccessibleForFree: true,
       offers: [

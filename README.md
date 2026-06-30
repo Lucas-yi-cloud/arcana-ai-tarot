@@ -4,7 +4,7 @@ Arcana AI is a full-stack AI tarot reading web app built from a high-fidelity de
 
 ## Features
 
-- Fourteen tarot spreads, including Daily Draw, Celtic Cross, Relationship Mirror, and Year Ahead
+- Twenty tarot spreads, including Daily Draw, Celtic Cross, Ex & Closure, Week Ahead, and Year Ahead
 - Animated spread previews, draw stage, card flip interaction, and result view
 - Real server-side AI interpretation via Claude (per-card readings + synthesis), with a deterministic fallback when no API key is set
 - Google OAuth sign-in with email one-time-code fallback and HttpOnly session cookies

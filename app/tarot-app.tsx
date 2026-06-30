@@ -182,6 +182,48 @@ const spreadPrompts: Record<string, string[]> = {
     "What should I nurture this month?",
     "How do I make a fresh start?",
   ],
+  "week-ahead": [
+    "What should I prepare for this week?",
+    "How can I pace myself over the next seven days?",
+    "Where should I put my attention this week?",
+    "What challenge might I meet this week?",
+    "How can I make this week feel more aligned?",
+  ],
+  "ex-closure": [
+    "What do I need to understand about this past connection?",
+    "What am I still holding from my ex?",
+    "How can I find closure without going backward?",
+    "What lesson should I carry from this relationship?",
+    "What am I ready to release now?",
+  ],
+  "interview-offer": [
+    "How should I prepare for this interview?",
+    "What strength should I lead with in this opportunity?",
+    "Is this role aligned with where I am growing?",
+    "What should I understand before accepting this offer?",
+    "How can I show up clearly in this hiring process?",
+  ],
+  "family-dynamics": [
+    "What pattern is shaping my family right now?",
+    "How can I hold a healthier boundary with family?",
+    "What is unspoken in this family situation?",
+    "What would help repair this family tension?",
+    "How can I respond without repeating the old pattern?",
+  ],
+  "life-purpose": [
+    "What is quietly calling me forward?",
+    "What gift am I meant to use more fully?",
+    "What fear is keeping my purpose small?",
+    "Where should I focus my long-term growth?",
+    "What next step would make my life feel more meaningful?",
+  ],
+  "block-breakthrough": [
+    "What is really blocking me right now?",
+    "How do I move through this creative block?",
+    "What is keeping this decision stuck?",
+    "What resource can help me break through?",
+    "What shift would open momentum again?",
+  ],
   "year-ahead": [
     "What should I focus on this year?",
     "What theme runs through the months ahead?",
@@ -461,7 +503,7 @@ function SeoSection({
   onToggleFaq: (index: number) => void;
 }) {
   const stats = [
-    ["14", "traditional spreads"],
+    [String(spreads.length), "traditional spreads"],
     ["22", "Major Arcana cards"],
     ["1909", "Rider-Waite tradition"],
     ["100%", "private readings"],
@@ -519,7 +561,7 @@ function SeoSection({
         </h2>
         <p>
           Arcana AI turns the centuries-old practice of tarot into a guided digital
-          ritual. Choose from fourteen traditional spreads, hold your question, and draw
+          ritual. Choose from twenty traditional spreads, hold your question, and draw
           from the complete Rider-Waite Major Arcana. Every <strong>AI tarot reading</strong>{" "}
           interprets the exact cards you drew — their position, their orientation, and the
           question you asked — into language you can actually act on.

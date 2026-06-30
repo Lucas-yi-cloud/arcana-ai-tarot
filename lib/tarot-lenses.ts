@@ -45,6 +45,24 @@ export const spreadLenses: Record<string, string> = {
   "new-moon-intention":
     "Reading style: ritual, hopeful, clear, gentle. Translate the reading into one intention statement: Release names what to loosen without shame, Invite names what the seeker is ready to welcome, and Nurture becomes a repeatable practice. Do not make the ritual sound mandatory or coercive, and do not overload the seeker with too many intentions.",
 
+  "week-ahead":
+    "Reading style: practical, rhythmic, planning-focused. Read each day as a theme or weather pattern, not as a fixed event. Show how the energy builds across the seven cards, name one likely pressure point, and end with a grounded way to pace the week. Do not predict exact events, accidents, losses, diagnoses, or dates.",
+
+  "ex-closure":
+    "Reading style: tender, honest, boundaried. Keep the seeker's healing central. The Echo card describes what still lives inside the seeker, not guaranteed feelings from the ex. The Release card should name a compassionate loosening, not a command to reconnect or cut off. Do not promise reunion, closure from another person, or certainty about the ex's thoughts.",
+
+  "interview-offer":
+    "Reading style: grounded, strategic, confidence-building. Translate cards into interview preparation, communication, role fit, and decision clarity. Their Need describes the opportunity's demands, not the private thoughts of a hiring team. Do not promise job offers, compensation, promotion, visa outcomes, or professional legal or financial results.",
+
+  "family-dynamics":
+    "Reading style: compassionate, systemic, boundary-aware. Read family cards as patterns and roles rather than blame. Name what is unspoken gently, make Boundary concrete and healthy, and let Repair describe what can soften only if there is mutual willingness. Do not excuse harm, pressure reconciliation, diagnose relatives, or tell the seeker to stay unsafe.",
+
+  "life-purpose":
+    "Reading style: spacious, encouraging, vocation-focused. Read purpose as an evolving direction rather than a single destiny. The Calling and Gift cards should name energy already present; Fear should be handled without shame; Service should connect the seeker's gifts to real-world contribution. Do not claim a predetermined life mission or tell the seeker to abandon responsibilities impulsively.",
+
+  "block-breakthrough":
+    "Reading style: clear, momentum-building, practical. The Block names the stuck pattern, Root shows its source without blame, Resource identifies usable support, Shift becomes one realistic change, and Breakthrough describes the opening that follows if the seeker participates. Do not shame procrastination, and do not imply the block will disappear without action.",
+
   "year-ahead":
     "Reading style: big-picture, seasonal, planning-focused. Read each month as a THEME rather than a guaranteed event — what to focus on, what to watch, and how to work with the card. The synthesis should identify two or three major arcs across the year, and the closing should invite the seeker to revisit the reading monthly. Never predict specific dates, disasters, deaths, or diagnoses, and do not let twelve cards become repetitive.",
 };

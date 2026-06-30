@@ -1,7 +1,7 @@
 # Arcana AI Tarot LLM Prompt Framework
 
 Version: 2026-06-24  
-Product source: AI Tarot product design v2 + current 14-spread app data  
+Product source: AI Tarot product design v2 + current 20-spread app data
 Deck scope: Rider-Waite-Smith Major Arcana, 22 cards only
 
 ## 1. Product Goal
@@ -742,6 +742,202 @@ Each spread lens below should be injected into `{{spreadLens}}`.
 }
 ```
 
+### 8.15 Week Ahead
+
+```json
+{
+  "id": "week-ahead",
+  "name": "Week Ahead",
+  "purpose": "A seven-card map for the days and choices ahead.",
+  "bestFor": "Weekly planning, pacing, and emotional preparation.",
+  "positions": [
+    {"label": "Day 1", "desc": "The opening tone."},
+    {"label": "Day 2", "desc": "What begins to move."},
+    {"label": "Day 3", "desc": "The early challenge."},
+    {"label": "Day 4", "desc": "The turning point."},
+    {"label": "Day 5", "desc": "What needs focus."},
+    {"label": "Day 6", "desc": "What supports you."},
+    {"label": "Day 7", "desc": "The integration."}
+  ],
+  "lens": {
+    "readingStyle": "practical, rhythmic, planning-focused",
+    "selectionGuidanceForAiResonance": "Choose cards that create a varied seven-day emotional weather map. The sequence should show pace, pressure, support, and integration rather than fixed events.",
+    "interpretationFocus": [
+      "Read each day as a theme or weather pattern, not a guaranteed event.",
+      "Show how the energy builds across the seven cards.",
+      "Name one likely pressure point and one support point.",
+      "Close with a grounded way to pace the week."
+    ],
+    "avoid": [
+      "Do not predict exact events, accidents, losses, diagnoses, or dates.",
+      "Do not make the week sound predetermined."
+    ]
+  }
+}
+```
+
+### 8.16 Ex & Closure
+
+```json
+{
+  "id": "ex-closure",
+  "name": "Ex & Closure",
+  "purpose": "Understand what remains, what healed, and what to release.",
+  "bestFor": "Breakups, old connections, and emotional closure.",
+  "positions": [
+    {"label": "You now", "desc": "Where your heart stands."},
+    {"label": "The echo", "desc": "What still lingers."},
+    {"label": "Unfinished lesson", "desc": "What the bond taught."},
+    {"label": "What to keep", "desc": "The wisdom worth carrying."},
+    {"label": "What to release", "desc": "The tie ready to loosen."}
+  ],
+  "lens": {
+    "readingStyle": "tender, honest, boundaried",
+    "selectionGuidanceForAiResonance": "Choose cards that keep the seeker's healing central. The Echo and Release positions can hold more complicated cards, while What to keep should identify usable wisdom.",
+    "interpretationFocus": [
+      "Keep the seeker's healing and agency at the center.",
+      "The Echo card describes what still lives inside the seeker, not guaranteed feelings from the ex.",
+      "What to keep should name wisdom without romanticizing pain.",
+      "What to release should offer compassionate loosening, not a command."
+    ],
+    "avoid": [
+      "Do not promise reunion or closure from another person.",
+      "Do not claim certainty about the ex's thoughts or feelings."
+    ]
+  }
+}
+```
+
+### 8.17 Interview & Offer
+
+```json
+{
+  "id": "interview-offer",
+  "name": "Interview & Offer",
+  "purpose": "Prepare for an interview, offer, or next career gate.",
+  "bestFor": "Job interviews, hiring loops, and offer decisions.",
+  "positions": [
+    {"label": "Your strength", "desc": "What to lead with."},
+    {"label": "Their need", "desc": "What the opportunity asks for."},
+    {"label": "Prep focus", "desc": "Where to sharpen attention."},
+    {"label": "Likely fit", "desc": "How the path may align."}
+  ],
+  "lens": {
+    "readingStyle": "grounded, strategic, confidence-building",
+    "selectionGuidanceForAiResonance": "Choose cards that translate into interview preparation, communication style, role demands, and fit. Use challenging cards to show preparation needs rather than failure.",
+    "interpretationFocus": [
+      "Translate symbolism into interview behavior, preparation, and clarity.",
+      "Their Need describes the opportunity's demands, not private thoughts from a hiring team.",
+      "Likely fit should discuss alignment and questions to investigate.",
+      "Close with one practical preparation focus."
+    ],
+    "avoid": [
+      "Do not promise job offers, compensation, promotion, visa outcomes, or hiring results.",
+      "Do not provide professional legal or financial advice."
+    ]
+  }
+}
+```
+
+### 8.18 Family Dynamics
+
+```json
+{
+  "id": "family-dynamics",
+  "name": "Family Dynamics",
+  "purpose": "Read patterns, boundaries, and repair inside family ties.",
+  "bestFor": "Family tension, caregiving, and old household patterns.",
+  "positions": [
+    {"label": "You", "desc": "Your role in the pattern."},
+    {"label": "The pattern", "desc": "What keeps repeating."},
+    {"label": "Unspoken need", "desc": "What is asking to be heard."},
+    {"label": "Boundary", "desc": "What needs protection."},
+    {"label": "Repair", "desc": "What could soften."},
+    {"label": "Next step", "desc": "The healthiest move now."}
+  ],
+  "lens": {
+    "readingStyle": "compassionate, systemic, boundary-aware",
+    "selectionGuidanceForAiResonance": "Choose cards that reveal a family pattern without blaming one person. Boundary and Next step should be concrete and stabilizing.",
+    "interpretationFocus": [
+      "Read family cards as roles and patterns rather than blame.",
+      "Name unspoken needs gently and without diagnosing anyone.",
+      "Make the Boundary card concrete and healthy.",
+      "Repair describes what could soften only if there is mutual willingness."
+    ],
+    "avoid": [
+      "Do not excuse harm or pressure reconciliation.",
+      "Do not diagnose relatives or tell the seeker to stay unsafe."
+    ]
+  }
+}
+```
+
+### 8.19 Life Purpose
+
+```json
+{
+  "id": "life-purpose",
+  "name": "Life Purpose",
+  "purpose": "Explore gifts, fears, direction, service, and the next meaningful step.",
+  "bestFor": "Meaning, vocation, and long-term personal growth.",
+  "positions": [
+    {"label": "Calling", "desc": "What is quietly calling you."},
+    {"label": "Gift", "desc": "A strength to trust."},
+    {"label": "Fear", "desc": "What makes the path shrink."},
+    {"label": "Teacher", "desc": "What life is showing you."},
+    {"label": "Path", "desc": "Where energy wants to move."},
+    {"label": "Service", "desc": "How your gift meets the world."},
+    {"label": "Next step", "desc": "The grounded step to take."}
+  ],
+  "lens": {
+    "readingStyle": "spacious, encouraging, vocation-focused",
+    "selectionGuidanceForAiResonance": "Choose cards that show an evolving direction, a usable gift, a fear to meet gently, and one grounded next step. Avoid making purpose sound like a single destiny.",
+    "interpretationFocus": [
+      "Read purpose as an evolving direction rather than a fixed fate.",
+      "Calling and Gift should name energy already present.",
+      "Fear should be handled without shame.",
+      "Service should connect the seeker's gifts to real-world contribution."
+    ],
+    "avoid": [
+      "Do not claim a predetermined life mission.",
+      "Do not tell the seeker to abandon responsibilities impulsively."
+    ]
+  }
+}
+```
+
+### 8.20 Block Breakthrough
+
+```json
+{
+  "id": "block-breakthrough",
+  "name": "Block Breakthrough",
+  "purpose": "Name what is stuck and find the move that opens it.",
+  "bestFor": "Creative blocks, avoidance, and stalled decisions.",
+  "positions": [
+    {"label": "The block", "desc": "What is stopping flow."},
+    {"label": "Root", "desc": "Where it comes from."},
+    {"label": "Resource", "desc": "What can help."},
+    {"label": "Shift", "desc": "What needs to change."},
+    {"label": "Breakthrough", "desc": "What opens next."}
+  ],
+  "lens": {
+    "readingStyle": "clear, momentum-building, practical",
+    "selectionGuidanceForAiResonance": "Choose cards that identify the stuck pattern, its source, a usable resource, a realistic shift, and the opening that follows if the seeker participates.",
+    "interpretationFocus": [
+      "The Block names the stuck pattern without shame.",
+      "Root shows source or context without blame.",
+      "Resource identifies usable support.",
+      "Shift becomes one realistic change, and Breakthrough describes the opening that follows."
+    ],
+    "avoid": [
+      "Do not shame procrastination or avoidance.",
+      "Do not imply the block disappears without action."
+    ]
+  }
+}
+```
+
 ## 9. Full Production Prompt Example
 
 This is a complete interpretation prompt for the current app's recommended random draw mode.
@@ -862,4 +1058,3 @@ Before shipping a prompt change, test:
 - Celtic Cross synthesis connects all position groups.
 - Year Ahead avoids specific predictions and reads months as themes.
 - The response is valid JSON without Markdown.
-
