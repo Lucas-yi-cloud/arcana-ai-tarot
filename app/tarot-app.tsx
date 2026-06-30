@@ -4,7 +4,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
-import { siteTitle, spreadSeoMeta } from "@/lib/tarot-seo";
+import { spreadDescription, spreadTitle } from "@/lib/structured-data";
+import { siteBaseUrl, siteDescription, siteTitle, spreadSeoMeta } from "@/lib/tarot-seo";
 
 type Route =
   | "home"
@@ -282,9 +283,14 @@ function routePath(route: Route, spread: Spread) {
   return "/";
 }
 
+function absoluteRouteUrl(route: Route, spread: Spread) {
+  const path = routePath(route, spread);
+  return path === "/" ? siteBaseUrl : `${siteBaseUrl}${path}`;
+}
+
 function documentTitleForRoute(route: Route, spread: Spread) {
   if (route === "detail" || route === "question" || route === "draw" || route === "result") {
-    return `${spread.name} Tarot Reading — Free AI ${spread.name} Spread | Arcana AI`;
+    return spreadTitle(spread);
   }
   if (route === "about") {
     return "About Arcana AI — A Quieter Way to Ask the Cards";
@@ -299,6 +305,88 @@ function documentTitleForRoute(route: Route, spread: Spread) {
     return "Journals — Arcana AI Tarot";
   }
   return siteTitle;
+}
+
+function documentDescriptionForRoute(route: Route, spread: Spread) {
+  if (route === "detail" || route === "question" || route === "draw" || route === "result") {
+    return spreadDescription(spread);
+  }
+  if (route === "about") {
+    return "Learn how Arcana AI pairs Rider-Waite tarot symbolism with AI-guided interpretation for private, reflective readings.";
+  }
+  if (route === "privacy") {
+    return "Read how Arcana AI handles accounts, saved tarot readings, payments, cookies, and privacy requests.";
+  }
+  if (route === "contact") {
+    return "Contact Arcana AI for support, privacy requests, product feedback, or partnership questions.";
+  }
+  if (route === "history") {
+    return "Sign in to view your private Arcana AI tarot journal and saved readings.";
+  }
+  return siteDescription;
+}
+
+function robotsForRoute(route: Route) {
+  return route === "history" ? "noindex, follow" : "index, follow";
+}
+
+function ensureSingleHeadElement<T extends HTMLElement>(
+  selector: string,
+  createElement: () => T
+) {
+  const existing = Array.from(document.head.querySelectorAll<T>(selector));
+  const element = existing[0] ?? createElement();
+  existing.slice(1).forEach((node) => node.remove());
+  if (!element.parentElement) document.head.appendChild(element);
+  return element;
+}
+
+function syncDocumentHead(route: Route, spread: Spread) {
+  const title = documentTitleForRoute(route, spread);
+  const description = documentDescriptionForRoute(route, spread);
+  const canonicalUrl = absoluteRouteUrl(route, spread);
+
+  document.title = title;
+
+  const canonical = ensureSingleHeadElement("link[rel='canonical']", () => {
+    const link = document.createElement("link");
+    link.rel = "canonical";
+    return link;
+  });
+  canonical.href = canonicalUrl;
+
+  const descriptionMeta = ensureSingleHeadElement("meta[name='description']", () => {
+    const meta = document.createElement("meta");
+    meta.name = "description";
+    return meta;
+  });
+  descriptionMeta.content = description;
+
+  const robotsMeta = ensureSingleHeadElement("meta[name='robots']", () => {
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    return meta;
+  });
+  robotsMeta.content = robotsForRoute(route);
+
+  const ogUrl = document.head.querySelector<HTMLMetaElement>("meta[property='og:url']");
+  if (ogUrl) ogUrl.content = canonicalUrl;
+
+  const ogTitle = document.head.querySelector<HTMLMetaElement>("meta[property='og:title']");
+  if (ogTitle) ogTitle.content = title;
+
+  const ogDescription = document.head.querySelector<HTMLMetaElement>(
+    "meta[property='og:description']"
+  );
+  if (ogDescription) ogDescription.content = description;
+
+  const twitterTitle = document.head.querySelector<HTMLMetaElement>("meta[name='twitter:title']");
+  if (twitterTitle) twitterTitle.content = title;
+
+  const twitterDescription = document.head.querySelector<HTMLMetaElement>(
+    "meta[name='twitter:description']"
+  );
+  if (twitterDescription) twitterDescription.content = description;
 }
 
 function routeStateFromPath(pathname: string): { route: Route; spreadId?: string } {
@@ -1197,9 +1285,7 @@ export default function TarotApp({
   }, [user]);
 
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.title = documentTitleForRoute(route, spread);
-    }
+    syncDocumentHead(route, spread);
   }, [route, spread]);
 
   useEffect(() => {
