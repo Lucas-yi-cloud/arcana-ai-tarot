@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { canUseFreeReading, FREE_READING_LIMIT } from "@/lib/readings";
 
 /**
@@ -8,8 +8,16 @@ import { canUseFreeReading, FREE_READING_LIMIT } from "@/lib/readings";
  * animation without burning a free read on a draw that never produces a result.
  */
 export async function POST(request: Request) {
-  const { user, response } = await requireUser(request);
-  if (!user) return response;
+  const user = await getCurrentUser(request);
+  if (!user) {
+    return Response.json({
+      ok: true,
+      eligible: true,
+      subscribed: false,
+      freeUsed: 0,
+      freeLimit: FREE_READING_LIMIT,
+    });
+  }
 
   if (user.subscribed) {
     return Response.json({ ok: true, eligible: true, subscribed: true, freeUsed: user.freeUsed });

@@ -1,7 +1,7 @@
 import { and, eq, lt, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { interpretReading, type DrawInput } from "@/lib/ai";
 import { FREE_READING_LIMIT } from "@/lib/readings";
 import { jsonError } from "@/lib/security";
@@ -15,8 +15,7 @@ type DrawnCardInput = { num?: string; reversed?: boolean };
  * so card meanings and positions cannot be tampered with by the client.
  */
 export async function POST(request: Request) {
-  const { user, response } = await requireUser(request);
-  if (!user) return response;
+  const user = await getCurrentUser(request);
 
   let payload: { spreadId?: string; question?: string; cards?: DrawnCardInput[] };
   try {
@@ -53,16 +52,16 @@ export async function POST(request: Request) {
     });
   }
 
-  const db = getDb();
   const question = typeof payload.question === "string" ? payload.question.slice(0, 800) : "";
 
   // Reserve a free read ATOMICALLY before generating, so concurrent requests
   // can't each pass an eligibility check against a stale count and bypass the
   // limit. The conditional UPDATE only succeeds while free_used < limit; if it
   // affects zero rows the paywall has been hit. Subscribers skip the gate.
-  let freeUsed = user.freeUsed;
+  let freeUsed = user?.freeUsed ?? 0;
   let reserved = false;
-  if (!user.subscribed) {
+  if (user && !user.subscribed) {
+    const db = getDb();
     const rows = await db
       .update(users)
       .set({ freeUsed: sql`${users.freeUsed} + 1` })
@@ -84,8 +83,8 @@ export async function POST(request: Request) {
     interpretation = await interpretReading(spread, question, cards);
   } catch {
     // Refund the reserved read if generation throws unexpectedly.
-    if (reserved) {
-      await db
+    if (user && reserved) {
+      await getDb()
         .update(users)
         .set({ freeUsed: sql`max(${users.freeUsed} - 1, 0)` })
         .where(eq(users.id, user.id));
@@ -95,7 +94,7 @@ export async function POST(request: Request) {
 
   return Response.json({
     ok: true,
-    subscribed: user.subscribed,
+    subscribed: user?.subscribed ?? false,
     freeUsed,
     freeLimit: FREE_READING_LIMIT,
     interpretation,

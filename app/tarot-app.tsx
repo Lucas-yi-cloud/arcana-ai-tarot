@@ -21,6 +21,20 @@ type DrawPhase = "idle" | "shuffling" | "dealt";
 // Legacy Stripe metadata uses these keys:
 // year = Quarterly Pass, quarter = Monthly Pass.
 type Plan = "year" | "quarter";
+type PaywallSource = "nav" | "result" | "draw_limit" | "new_reading";
+type TrackEvent =
+  | "landing_view"
+  | "spread_click"
+  | "question_submit"
+  | "draw_start"
+  | "draw_complete"
+  | "result_view"
+  | "paywall_view"
+  | "login_start"
+  | "login_success"
+  | "checkout_start"
+  | "checkout_success"
+  | "checkout_cancel";
 
 type User = {
   id: string;
@@ -70,6 +84,14 @@ type SavedReading = {
     cards: DrawnCard[];
     synthesis: string;
   };
+};
+
+type SaveReadingPayload = {
+  spreadId: string;
+  spreadName: string;
+  question: string;
+  cards: DrawnCard[];
+  synthesis: string;
 };
 
 type StripeConfig = {
@@ -236,6 +258,10 @@ const spreadPrompts: Record<string, string[]> = {
 
 const googleResumeKey = "arcana.googleLoginResume";
 const checkoutResumeKey = "arcana.checkoutResume";
+const guestFreeUsedKey = "aitarot.freeUsed";
+const pendingSaveKey = "arcana.pendingSave";
+const pendingSavePayloadKey = "arcana.pendingSavePayload";
+const shuffleDurationMs = 5000;
 
 const faqs = [
   {
@@ -1178,7 +1204,8 @@ export default function TarotApp({
   const [cards, setCards] = useState<DrawnCard[]>([]);
   const [drawPhase, setDrawPhase] = useState<DrawPhase>("idle");
   const [user, setUser] = useState<User | null>(null);
-  const [freeLimit, setFreeLimit] = useState(2);
+  const [freeLimit, setFreeLimit] = useState(1);
+  const [guestFreeUsed, setGuestFreeUsed] = useState(() => readGuestFreeUsed());
   const [authOpen, setAuthOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authCode, setAuthCode] = useState("");
@@ -1187,8 +1214,10 @@ export default function TarotApp({
   const [authMessage, setAuthMessage] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<Plan>("year");
+  const [selectedPlan, setSelectedPlan] = useState<Plan>("quarter");
+  const [paywallSrc, setPaywallSrc] = useState<PaywallSource>("nav");
   const [pendingDraw, setPendingDraw] = useState(false);
+  const [pendingSave, setPendingSave] = useState(false);
   const [stripeConfig, setStripeConfig] = useState<StripeConfig | null>(null);
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
@@ -1196,9 +1225,11 @@ export default function TarotApp({
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
   const [revealing, setRevealing] = useState(false);
+  const [resultLoading, setResultLoading] = useState(false);
   const [aiSynthesis, setAiSynthesis] = useState("");
   const [openFaq, setOpenFaq] = useState(-1);
   const beginDrawRef = useRef<() => Promise<void>>(async () => undefined);
+  const latestSavePayloadRef = useRef<SaveReadingPayload | null>(null);
 
   const spread = useMemo(
     () => spreads.find((item) => item.id === spreadId) ?? spreads[0],
@@ -1228,6 +1259,83 @@ export default function TarotApp({
     () => spreadPrompts[spread.id] ?? defaultPrompts,
     [spread.id]
   );
+  const userStatus = user?.subscribed ? "pro" : user ? "free" : "guest";
+  const effectiveFreeUsed = user ? user.freeUsed : guestFreeUsed;
+  const freeReadingsLeft = Math.max(0, freeLimit - effectiveFreeUsed);
+  const isSubscribed = Boolean(user?.subscribed);
+
+  function track(event: TrackEvent, params: Record<string, unknown> = {}) {
+    const search = new URLSearchParams(window.location.search);
+    const payload = {
+      page_url: window.location.href,
+      referrer: document.referrer || "",
+      utm_source: search.get("utm_source") || "",
+      utm_campaign: search.get("utm_campaign") || "",
+      utm_term: search.get("utm_term") || "",
+      user_status: userStatus,
+      free_readings_left: freeReadingsLeft,
+      spread_id: spread.id,
+      device_type: window.matchMedia("(max-width: 760px)").matches ? "mobile" : "desktop",
+      timestamp: new Date().toISOString(),
+      ...params,
+    };
+    const win = window as typeof window & {
+      dataLayer?: Array<Record<string, unknown>>;
+    };
+    win.dataLayer = win.dataLayer || [];
+    win.dataLayer.push({ event, ...payload });
+  }
+
+  function readGuestFreeUsed() {
+    if (typeof window === "undefined") return 0;
+    const value = Number(window.localStorage.getItem(guestFreeUsedKey) || "0");
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+  }
+
+  function setStoredGuestFreeUsed(value: number) {
+    const next = Math.max(0, value);
+    window.localStorage.setItem(guestFreeUsedKey, String(next));
+    setGuestFreeUsed(next);
+  }
+
+  function currentSavePayload(): SaveReadingPayload {
+    return {
+      spreadId: spread.id,
+      spreadName: spread.name,
+      question,
+      cards,
+      synthesis: aiSynthesis || synthesis,
+    };
+  }
+
+  function queuePendingSave() {
+    const payload = currentSavePayload();
+    latestSavePayloadRef.current = payload;
+    setPendingSave(true);
+    window.sessionStorage.setItem(pendingSaveKey, "1");
+    window.sessionStorage.setItem(pendingSavePayloadKey, JSON.stringify(payload));
+  }
+
+  function openLogin(trigger: string) {
+    track("login_start", { trigger });
+    setAuthOpen(true);
+  }
+
+  function openPaywall(src: PaywallSource) {
+    setPaywallSrc(src);
+    setCheckoutMessage("");
+    setCheckoutBusy(false);
+    setShowPaywall(true);
+    track("paywall_view", { paywall_src: src });
+  }
+
+  function closePaywall(trackCancel = false) {
+    if (trackCancel) track("checkout_cancel", { paywall_src: paywallSrc });
+    setShowPaywall(false);
+    setPendingDraw(false);
+    setCheckoutMessage("");
+    setCheckoutBusy(false);
+  }
 
   async function refreshMe() {
     const response = await fetch("/api/me");
@@ -1242,18 +1350,29 @@ export default function TarotApp({
   }
 
   useEffect(() => {
+    const storedGuestFreeUsed = readGuestFreeUsed();
+    track("landing_view", {
+      route,
+      free_readings_left: Math.max(0, freeLimit - storedGuestFreeUsed),
+    });
+    // landing_view should fire once per page load with the entry route.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const loginStatus = params.get("login");
     if (!loginStatus) return;
 
     window.setTimeout(() => {
       if (loginStatus === "google-ok") {
+        track("login_success", { method: "google" });
         flash("Signed in with Google.");
       } else if (loginStatus === "google-config") {
-        setAuthOpen(true);
+        openLogin("google_config_error");
         setAuthMessage("Google sign-in is not configured yet.");
       } else if (loginStatus === "google-error") {
-        setAuthOpen(true);
+        openLogin("google_error");
         setAuthMessage("Google sign-in could not be completed. Please try again.");
       }
     }, 0);
@@ -1265,6 +1384,8 @@ export default function TarotApp({
       "",
       `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`
     );
+    // This consumes one-time URL params on initial load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1289,6 +1410,30 @@ export default function TarotApp({
 
   useEffect(() => {
     if (!user) return;
+    const rawPendingSave = window.sessionStorage.getItem(pendingSavePayloadKey);
+    if (rawPendingSave || pendingSave || window.sessionStorage.getItem(pendingSaveKey)) {
+      window.sessionStorage.removeItem(pendingSaveKey);
+      window.sessionStorage.removeItem(pendingSavePayloadKey);
+      window.setTimeout(() => {
+        setPendingSave(false);
+        try {
+          const payload = rawPendingSave
+            ? (JSON.parse(rawPendingSave) as SaveReadingPayload)
+            : latestSavePayloadRef.current;
+          if (payload) {
+            setSpreadId(payload.spreadId);
+            setQuestion(payload.question);
+            setCards(payload.cards.map((card) => ({ ...card, flipped: true })));
+            setAiSynthesis(payload.synthesis);
+            setRoute("result");
+            window.setTimeout(() => void persistReading(payload), 250);
+          }
+        } catch {
+          flash("Signed in. Please save the reading again.");
+        }
+      }, 0);
+    }
+
     const rawResume = window.sessionStorage.getItem(googleResumeKey);
     if (!rawResume) return;
     window.sessionStorage.removeItem(googleResumeKey);
@@ -1310,6 +1455,8 @@ export default function TarotApp({
     } catch {
       window.sessionStorage.removeItem(googleResumeKey);
     }
+    // This resumes work only when a session becomes available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -1351,6 +1498,7 @@ export default function TarotApp({
     if (checkout === "cancel") {
       clearParams();
       window.sessionStorage.removeItem(checkoutResumeKey);
+      track("checkout_cancel", { paywall_src: "checkout_return" });
       window.setTimeout(() => flash("Checkout canceled — you were not charged."), 0);
       return;
     }
@@ -1398,6 +1546,10 @@ export default function TarotApp({
           return;
         }
         if (data.ok) {
+          track("checkout_success", {
+            checkout_session_id: sessionId,
+            currency: "USD",
+          });
           flash("You're Pro — unlimited readings unlocked.");
           resumeDraw();
         } else {
@@ -1407,17 +1559,25 @@ export default function TarotApp({
         flash("Payment received — your membership will activate shortly.");
       }
     })();
+    // This consumes Stripe return params on initial load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function startCheckout(plan: Plan) {
     if (!user) {
-      setAuthOpen(true);
+      openLogin("checkout");
       return;
     }
     if (!stripeConfig?.enabled || checkoutBusy) return;
 
     setCheckoutBusy(true);
     setCheckoutMessage("Redirecting to secure checkout…");
+    track("checkout_start", {
+      paywall_src: paywallSrc,
+      product_id: stripeConfig.prices[plan] || plan,
+      price: plan === "year" ? 19.99 : 9.99,
+      currency: "USD",
+    });
     if (pendingDraw) {
       window.sessionStorage.setItem(
         checkoutResumeKey,
@@ -1449,6 +1609,7 @@ export default function TarotApp({
     setSpreadId(nextSpread.id);
     setRoute("detail");
     pushRoutePath("detail", nextSpread);
+    track("spread_click", { spread_id: nextSpread.id });
     window.scrollTo({ top: 0 });
   }
 
@@ -1472,33 +1633,48 @@ export default function TarotApp({
     window.scrollTo({ top: 0 });
   }
 
-  async function beginDraw() {
-    if (!user) {
-      setAuthOpen(true);
-      setPendingDraw(true);
-      return;
-    }
-
-    const response = await fetch("/api/readings/begin", { method: "POST" });
-    if (response.status === 402) {
-      setShowPaywall(true);
-      setPendingDraw(true);
-      return;
-    }
-    if (!response.ok) {
-      flash("Could not start the reading. Please sign in again.");
-      return;
-    }
-
+  function startDrawAnimation() {
     setAiSynthesis("");
+    setResultLoading(false);
     setRoute("draw");
     setDrawPhase("shuffling");
     setCards([]);
+    track("draw_start");
     window.scrollTo({ top: 0 });
     window.setTimeout(() => {
       setCards(drawCards(spread));
       setDrawPhase("dealt");
-    }, 1800);
+      track("draw_complete");
+    }, shuffleDurationMs);
+  }
+
+  async function beginDraw() {
+    if (route === "question") {
+      track("question_submit", {
+        question_length: question.trim().length,
+      });
+    }
+
+    if (!isSubscribed && effectiveFreeUsed >= freeLimit) {
+      setPendingDraw(true);
+      openPaywall("draw_limit");
+      return;
+    }
+
+    if (user) {
+      const response = await fetch("/api/readings/begin", { method: "POST" });
+      if (response.status === 402) {
+        setPendingDraw(true);
+        openPaywall("draw_limit");
+        return;
+      }
+      if (!response.ok) {
+        flash("Could not start the reading. Please sign in again.");
+        return;
+      }
+    }
+
+    startDrawAnimation();
   }
 
   async function revealReading() {
@@ -1508,6 +1684,9 @@ export default function TarotApp({
       return;
     }
     setRevealing(true);
+    setResultLoading(true);
+    setRoute("result");
+    window.scrollTo({ top: 0 });
     try {
       const response = await fetch("/api/readings/interpret", {
         method: "POST",
@@ -1520,11 +1699,13 @@ export default function TarotApp({
       });
 
       if (response.status === 401) {
-        setAuthOpen(true);
+        openLogin("interpret");
+        setResultLoading(false);
         return;
       }
       if (response.status === 402) {
-        setShowPaywall(true);
+        openPaywall("draw_limit");
+        setResultLoading(false);
         return;
       }
 
@@ -1548,10 +1729,18 @@ export default function TarotApp({
         }))
       );
       setAiSynthesis(data.interpretation.synthesis);
-      await refreshMe();
-      setRoute("result");
-      window.scrollTo({ top: 0 });
+      if (user) {
+        await refreshMe();
+      } else {
+        setStoredGuestFreeUsed(readGuestFreeUsed() + 1);
+      }
+      setResultLoading(false);
+      track("result_view", {
+        spread_id: spread.id,
+        card_count: cards.length,
+      });
     } catch {
+      setResultLoading(false);
       flash("Could not generate the reading. Please try again.");
     } finally {
       setRevealing(false);
@@ -1560,6 +1749,9 @@ export default function TarotApp({
 
   function startGoogleLogin() {
     setAuthMessage("Opening Google sign-in...");
+    if (pendingSave) {
+      queuePendingSave();
+    }
     if (pendingDraw || route === "question") {
       window.sessionStorage.setItem(
         googleResumeKey,
@@ -1611,8 +1803,14 @@ export default function TarotApp({
     setAuthOpen(false);
     setCodeSent(false);
     setAuthCode("");
+    track("login_success", { method: "email" });
     flash("Signed in securely.");
-    if (pendingDraw) {
+    if (pendingSave) {
+      setPendingSave(false);
+      window.sessionStorage.removeItem(pendingSaveKey);
+      window.sessionStorage.removeItem(pendingSavePayloadKey);
+      window.setTimeout(() => void persistReading(latestSavePayloadRef.current ?? currentSavePayload()), 250);
+    } else if (pendingDraw) {
       setPendingDraw(false);
       window.setTimeout(() => void beginDraw(), 200);
     }
@@ -1626,22 +1824,12 @@ export default function TarotApp({
     flash("Signed out.");
   }
 
-  async function saveReading() {
-    if (!user) {
-      setAuthOpen(true);
-      return;
-    }
+  async function persistReading(payload: SaveReadingPayload = currentSavePayload()) {
     setSaving(true);
     const response = await fetch("/api/readings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        spreadId: spread.id,
-        spreadName: spread.name,
-        question,
-        cards,
-        synthesis: aiSynthesis || synthesis,
-      }),
+      body: JSON.stringify(payload),
     });
     setSaving(false);
     if (!response.ok) {
@@ -1651,12 +1839,34 @@ export default function TarotApp({
     flash("Reading saved to your journal.");
   }
 
+  async function saveReading() {
+    if (!user) {
+      queuePendingSave();
+      openLogin("save_journal");
+      return;
+    }
+    await persistReading();
+  }
+
+  function startNewReading() {
+    if (!isSubscribed && effectiveFreeUsed >= freeLimit) {
+      openPaywall("new_reading");
+      return;
+    }
+    goHome();
+  }
+
   function openSaved(reading: SavedReading) {
     setSpreadId(reading.spreadId);
     setQuestion(reading.question);
     setCards(reading.payload.cards.map((card) => ({ ...card, flipped: true })));
     setAiSynthesis(reading.payload.synthesis || "");
     setRoute("result");
+    track("result_view", {
+      spread_id: reading.spreadId,
+      source: "journal",
+      card_count: reading.payload.cards.length,
+    });
     window.scrollTo({ top: 0 });
   }
 
@@ -1698,7 +1908,7 @@ export default function TarotApp({
               </span>
             </div>
           ) : (
-            <button className="purple-pill" onClick={() => setShowPaywall(true)}>
+            <button className="purple-pill" onClick={() => openPaywall("nav")}>
               <span style={{ color: "var(--gold-bright)" }}>⚡</span>
               <span>Go Unlimited</span>
             </button>
@@ -1707,7 +1917,7 @@ export default function TarotApp({
             <button
               className="nav-signin"
               aria-label="Sign in with Google"
-              onClick={() => setAuthOpen(true)}
+              onClick={() => openLogin("nav")}
             >
               <GoogleLogo size={16} />
               <span>Sign in</span>
@@ -1754,7 +1964,7 @@ export default function TarotApp({
                         className="mini-upgrade"
                         onClick={() => {
                           setProfileOpen(false);
-                          setShowPaywall(true);
+                          openPaywall("nav");
                         }}
                       >
                         Upgrade
@@ -1846,7 +2056,9 @@ export default function TarotApp({
           <div className="section-head" id="spreads">
             <h2>Choose your spread</h2>
             <span>
-              {user ? membershipCaption(user, freeLimit) : "Choose a spread to begin your reading"}
+              {user
+                ? membershipCaption(user, freeLimit)
+                : `${freeReadingsLeft} free reading${freeReadingsLeft === 1 ? "" : "s"} available`}
             </span>
           </div>
           <div className="spread-grid">
@@ -1888,7 +2100,7 @@ export default function TarotApp({
           <SiteFooter
             onOpenSpread={openSpread}
             onGoHome={beginAtSpreads}
-            onOpenPaywall={() => setShowPaywall(true)}
+            onOpenPaywall={() => openPaywall("nav")}
             onRoute={goRoute}
           />
         </main>
@@ -1963,7 +2175,7 @@ export default function TarotApp({
           <SiteFooter
             onOpenSpread={openSpread}
             onGoHome={beginAtSpreads}
-            onOpenPaywall={() => setShowPaywall(true)}
+            onOpenPaywall={() => openPaywall("nav")}
             onRoute={goRoute}
           />
         </main>
@@ -2135,79 +2347,112 @@ export default function TarotApp({
             </section>
           )}
 
-          <section className="card-reading-section">
-            <span className="result-kicker">CARD BY CARD</span>
-            <div className="result-list">
-              {cards.map((card) => {
-                const keywords = card.reversed ? card.rev : card.up;
-                return (
-                  <article className="result-card" key={card.key}>
-                    <div className="result-card-image">
-                      <TarotImage card={card} reversed={card.reversed} />
-                    </div>
-                    <div className="result-card-copy">
-                      <div className="result-card-title">
-                        <span className="tag">{card.posLabel}</span>
-                        <h2>{card.name}</h2>
-                        <span className={`orientation-chip ${card.reversed ? "reversed" : "upright"}`}>
-                          {card.reversed ? "Reversed" : "Upright"}
-                        </span>
-                      </div>
-                      <ReadingParagraphs
-                        className="reading-copy"
-                        text={
-                          card.interpretation ??
-                          `${keywords[0]}, ${keywords[1]}. In this position, it points toward ${keywords[2]}.`
-                        }
-                      />
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
+          {resultLoading ? (
+            <section className="result-thinking" role="status" aria-live="polite">
+              <span className="thinking-orb" aria-hidden="true" />
+              <div>
+                <strong>The reader is interpreting your cards…</strong>
+                <p>Connecting the spread positions, card meanings, and your question.</p>
+              </div>
+            </section>
+          ) : (
+            <>
+              <section className="card-reading-section">
+                <span className="result-kicker">CARD BY CARD</span>
+                <div className="result-list">
+                  {cards.map((card) => {
+                    const keywords = card.reversed ? card.rev : card.up;
+                    return (
+                      <article className="result-card" key={card.key}>
+                        <div className="result-card-image">
+                          <TarotImage card={card} reversed={card.reversed} />
+                        </div>
+                        <div className="result-card-copy">
+                          <div className="result-card-title">
+                            <span className="tag">{card.posLabel}</span>
+                            <h2>{card.name}</h2>
+                            <span className={`orientation-chip ${card.reversed ? "reversed" : "upright"}`}>
+                              {card.reversed ? "Reversed" : "Upright"}
+                            </span>
+                          </div>
+                          <ReadingParagraphs
+                            className="reading-copy"
+                            text={
+                              card.interpretation ??
+                              `${keywords[0]}, ${keywords[1]}. In this position, it points toward ${keywords[2]}.`
+                            }
+                          />
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
 
-          <section className="result-reading-panel">
-            <div className="result-reading-label">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 3l2.45 6.55L21 12l-6.55 2.45L12 21l-2.45-6.55L3 12l6.55-2.45L12 3z" />
-              </svg>
-              <span>THE READING</span>
-            </div>
-            <ReadingParagraphs className="reading-synthesis serif" text={aiSynthesis || synthesis} />
-          </section>
+              <section className="result-reading-panel">
+                <div className="result-reading-label">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 3l2.45 6.55L21 12l-6.55 2.45L12 21l-2.45-6.55L3 12l6.55-2.45L12 3z" />
+                  </svg>
+                  <span>THE READING</span>
+                </div>
+                <ReadingParagraphs className="reading-synthesis serif" text={aiSynthesis || synthesis} />
+              </section>
 
-          <div className="result-actions">
-            <button className="primary-btn" disabled={saving} onClick={() => void saveReading()}>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z" />
-              </svg>
-              {saving ? "Saving..." : "Save to journal"}
-            </button>
-            <button className="secondary-btn" onClick={goHome}>
-              New reading
-            </button>
-          </div>
+              <div className="result-actions">
+                <button className="result-action-btn" disabled={saving} onClick={() => void saveReading()}>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z" />
+                  </svg>
+                  {saving ? "Saving..." : "Save to journal"}
+                </button>
+                <button className="result-action-btn" onClick={startNewReading}>
+                  New reading
+                </button>
+              </div>
+
+              {!isSubscribed ? (
+                <section className="result-upsell stage starfield">
+                  <div className="eyebrow">ARCANA PRO</div>
+                  <h2 className="serif">Want to ask another question about this reading?</h2>
+                  <p>
+                    Unlock unlimited readings and keep your private journal. Save this
+                    reading and continue whenever you return.
+                  </p>
+                  <div className="upsell-benefits">
+                    <span>✓ Unlimited readings</span>
+                    <span>✓ Private journal</span>
+                    <span>✓ All spreads unlocked</span>
+                  </div>
+                  <button className="white-btn" onClick={() => openPaywall("result")}>
+                    Go unlimited
+                  </button>
+                </section>
+              ) : (
+                <p className="pro-active-line">Unlimited readings active</p>
+              )}
+            </>
+          )}
         </main>
       )}
 
@@ -2231,7 +2476,7 @@ export default function TarotApp({
                 <p>{membershipCaption(user, freeLimit)}</p>
               </div>
               {!user.subscribed && (
-                <button className="primary-btn" onClick={() => setShowPaywall(true)}>
+                <button className="primary-btn" onClick={() => openPaywall("nav")}>
                   Upgrade
                 </button>
               )}
@@ -2243,7 +2488,7 @@ export default function TarotApp({
                 Your journal is private
               </h2>
               <p className="message">Sign in to sync readings and subscription access.</p>
-              <button className="primary-btn" onClick={() => setAuthOpen(true)}>
+              <button className="primary-btn" onClick={() => openLogin("journal")}>
                 Sign in
               </button>
             </section>
@@ -2328,7 +2573,7 @@ export default function TarotApp({
             if (user) {
               setProfileOpen((open) => !open);
             } else {
-              setAuthOpen(true);
+              openLogin("mobile_account");
             }
           }}
         >
@@ -2359,6 +2604,7 @@ export default function TarotApp({
               onClick={() => {
                 setAuthOpen(false);
                 setPendingDraw(false);
+                setPendingSave(false);
               }}
             >
               ✕
@@ -2427,10 +2673,7 @@ export default function TarotApp({
                 className="text-btn"
                 style={{ color: "#fff", float: "right" }}
                 onClick={() => {
-                  setShowPaywall(false);
-                  setPendingDraw(false);
-                  setCheckoutMessage("");
-                  setCheckoutBusy(false);
+                  closePaywall(true);
                 }}
               >
                 ✕
@@ -2440,8 +2683,13 @@ export default function TarotApp({
                 Unlimited readings await
               </h2>
               <p style={{ color: "rgba(255,255,255,.72)", marginBottom: 0 }}>
-                Unlock every spread and ask the cards as often as you like with a single pass.
+                Unlock every spread and keep a private journal of every reading.
               </p>
+              <div className="paywall-benefits" aria-label="Arcana Pro benefits">
+                <span>✓ Unlimited readings</span>
+                <span>✓ Private journal</span>
+                <span>✓ All spreads unlocked</span>
+              </div>
             </div>
             <div className="modal-body">
               {!user && (
@@ -2449,30 +2697,13 @@ export default function TarotApp({
                   <p className="message" style={{ marginTop: 0 }}>
                     Sign in first so your subscription is linked to the right account.
                   </p>
-                  <button className="primary-btn" onClick={() => setAuthOpen(true)}>
+                  <button className="primary-btn" onClick={() => openLogin("paywall")}>
                     Sign in
                   </button>
                 </>
               )}
               {user && (
                 <>
-                  <button
-                    className={`plan-row ${selectedPlan === "year" ? "selected" : ""}`}
-                    onClick={() => {
-                      setSelectedPlan("year");
-                      setCheckoutMessage("");
-                    }}
-                  >
-                    <span className="plan-radio" aria-hidden="true">
-                      <span />
-                    </span>
-                    <span>
-                      <strong>Quarterly Pass</strong>
-                      <br />
-                      <small>$19.99 · 90 days · unlimited readings · ≈ $6.66 / mo</small>
-                    </span>
-                    <span className="tag">BEST VALUE</span>
-                  </button>
                   <button
                     className={`plan-row ${selectedPlan === "quarter" ? "selected" : ""}`}
                     onClick={() => {
@@ -2486,8 +2717,26 @@ export default function TarotApp({
                     <span>
                       <strong>Monthly Pass</strong>
                       <br />
-                      <small>$9.99 · 30 days · unlimited readings · ≈ $9.99 / mo</small>
+                      <small>30 days · unlimited readings · ≈ $0.33 / day</small>
                     </span>
+                    <span className="tag">POPULAR</span>
+                  </button>
+                  <button
+                    className={`plan-row ${selectedPlan === "year" ? "selected" : ""}`}
+                    onClick={() => {
+                      setSelectedPlan("year");
+                      setCheckoutMessage("");
+                    }}
+                  >
+                    <span className="plan-radio" aria-hidden="true">
+                      <span />
+                    </span>
+                    <span>
+                      <strong>Quarterly Pass</strong>
+                      <br />
+                      <small>90 days · unlimited readings · ≈ $6.66 / mo</small>
+                    </span>
+                    <span className="tag">BEST VALUE</span>
                   </button>
                   {!stripeConfig?.enabled && (
                     <p className="message error">
@@ -2501,10 +2750,10 @@ export default function TarotApp({
                     onClick={() => void startCheckout(selectedPlan)}
                     aria-label={`Subscribe to the ${planName} with Stripe`}
                   >
-                    {checkoutBusy ? "Redirecting…" : `Subscribe — ${planPrice}`}
+                    {checkoutBusy ? "Redirecting…" : `Continue — ${planPrice}`}
                   </button>
                   {checkoutMessage && <p className="message">{checkoutMessage}</p>}
-                  <p className="message">Cancel anytime · renews automatically · secure checkout.</p>
+                  <p className="secure-line">🔒 Secure Stripe checkout · Cancel anytime</p>
                 </>
               )}
             </div>
