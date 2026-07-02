@@ -1205,7 +1205,7 @@ export default function TarotApp({
   const [drawPhase, setDrawPhase] = useState<DrawPhase>("idle");
   const [user, setUser] = useState<User | null>(null);
   const [freeLimit, setFreeLimit] = useState(1);
-  const [guestFreeUsed, setGuestFreeUsed] = useState(() => readGuestFreeUsed());
+  const [guestFreeUsed, setGuestFreeUsed] = useState(0);
   const [authOpen, setAuthOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authCode, setAuthCode] = useState("");
@@ -1281,9 +1281,14 @@ export default function TarotApp({
     };
     const win = window as typeof window & {
       dataLayer?: Array<Record<string, unknown>>;
+      gtag?: (command: "event", eventName: string, params: Record<string, unknown>) => void;
     };
-    win.dataLayer = win.dataLayer || [];
-    win.dataLayer.push({ event, ...payload });
+    if (typeof win.gtag === "function") {
+      win.gtag("event", event, payload);
+    } else {
+      win.dataLayer = win.dataLayer || [];
+      win.dataLayer.push({ event, ...payload });
+    }
   }
 
   function readGuestFreeUsed() {
@@ -1351,6 +1356,7 @@ export default function TarotApp({
 
   useEffect(() => {
     const storedGuestFreeUsed = readGuestFreeUsed();
+    window.setTimeout(() => setGuestFreeUsed(storedGuestFreeUsed), 0);
     track("landing_view", {
       route,
       free_readings_left: Math.max(0, freeLimit - storedGuestFreeUsed),
