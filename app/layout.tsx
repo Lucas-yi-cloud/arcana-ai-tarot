@@ -5,7 +5,7 @@ const siteTitle = "AI Tarot Reading — Free Online Tarot Card Readings | Arcana
 const siteDescription =
   "Get an AI tarot reading online in seconds. Ask a question, draw the cards, and let Arcana AI interpret the Rider-Waite deck — from a daily one-card draw to the full Celtic Cross. Free, private, and accurate.";
 const siteUrl = "https://mystic-ai.top";
-const gaMeasurementId = "G-BV1BZXP1X2";
+const gaMeasurementId = "G-DT7RGRTYV4";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
