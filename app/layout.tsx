@@ -5,8 +5,6 @@ const siteTitle = "AI Tarot Reading — Free Online Tarot Card Readings | Arcana
 const siteDescription =
   "Get an AI tarot reading online in seconds. Ask a question, draw the cards, and let Arcana AI interpret the Rider-Waite deck — from a daily one-card draw to the full Celtic Cross. Free, private, and accurate.";
 const siteUrl = "https://mystic-ai.top";
-const gaMeasurementId = "G-DT7RGRTYV4";
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: siteTitle,
@@ -61,11 +59,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script
-          async
-          src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
-        />
-        <script defer src="/ga4-init.js" />
+        <script async src="/ga4-init.js" />
       </head>
       <body>
         {children}
