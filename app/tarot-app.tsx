@@ -30,11 +30,16 @@ type TrackEvent =
   | "draw_complete"
   | "result_view"
   | "paywall_view"
+  | "paywall_cta_click"
+  | "plan_select"
   | "login_start"
   | "login_success"
+  | "begin_checkout"
   | "checkout_start"
   | "checkout_success"
-  | "checkout_cancel";
+  | "checkout_cancel"
+  | "checkout_error"
+  | "purchase";
 
 type User = {
   id: string;
@@ -98,6 +103,26 @@ type StripeConfig = {
   enabled: boolean;
   publishableKey: string;
   prices: Record<Plan, string>;
+};
+
+type CheckoutIntent = {
+  plan: Plan;
+  paywallSrc: PaywallSource;
+  productId: string;
+  value: number;
+  currency: "USD";
+};
+
+type ConfirmCheckoutResponse = {
+  ok?: boolean;
+  pending?: boolean;
+  error?: string;
+  plan?: Plan;
+  priceId?: string;
+  price?: number;
+  currency?: "USD";
+  subscriptionId?: string;
+  status?: string;
 };
 
 type TarotAppProps = {
@@ -258,10 +283,29 @@ const spreadPrompts: Record<string, string[]> = {
 
 const googleResumeKey = "arcana.googleLoginResume";
 const checkoutResumeKey = "arcana.checkoutResume";
+const checkoutIntentKey = "arcana.checkoutIntent";
 const guestFreeUsedKey = "aitarot.freeUsed";
 const pendingSaveKey = "arcana.pendingSave";
 const pendingSavePayloadKey = "arcana.pendingSavePayload";
 const shuffleDurationMs = 5000;
+
+const planAnalytics: Record<
+  Plan,
+  { itemId: string; itemName: string; periodDays: number; value: number }
+> = {
+  quarter: {
+    itemId: "arcana_monthly_pass",
+    itemName: "Monthly Pass",
+    periodDays: 30,
+    value: 9.99,
+  },
+  year: {
+    itemId: "arcana_quarterly_pass",
+    itemName: "Quarterly Pass",
+    periodDays: 90,
+    value: 19.99,
+  },
+};
 
 const faqs = [
   {
@@ -1291,6 +1335,79 @@ export default function TarotApp({
     }
   }
 
+  function isPlan(value: unknown): value is Plan {
+    return value === "year" || value === "quarter";
+  }
+
+  function isPaywallSource(value: unknown): value is PaywallSource {
+    return value === "nav" || value === "result" || value === "draw_limit" || value === "new_reading";
+  }
+
+  function planEventParams(plan: Plan, productId?: string, price?: number) {
+    const meta = planAnalytics[plan];
+    const value = typeof price === "number" && Number.isFinite(price) ? price : meta.value;
+    const itemId = productId || meta.itemId;
+    return {
+      plan,
+      plan_name: meta.itemName,
+      product_id: itemId,
+      value,
+      price: value,
+      currency: "USD",
+      items: [
+        {
+          item_id: itemId,
+          item_name: meta.itemName,
+          item_category: "subscription",
+          item_variant: `${meta.periodDays}_days`,
+          price: value,
+          quantity: 1,
+        },
+      ],
+    };
+  }
+
+  function writeCheckoutIntent(plan: Plan) {
+    const meta = planAnalytics[plan];
+    const intent: CheckoutIntent = {
+      plan,
+      paywallSrc,
+      productId: stripeConfig?.prices[plan] || meta.itemId,
+      value: meta.value,
+      currency: "USD",
+    };
+    window.sessionStorage.setItem(checkoutIntentKey, JSON.stringify(intent));
+    return intent;
+  }
+
+  function readCheckoutIntent() {
+    try {
+      const raw = window.sessionStorage.getItem(checkoutIntentKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<CheckoutIntent>;
+      if (!isPlan(parsed.plan)) return null;
+      return {
+        plan: parsed.plan,
+        paywallSrc: isPaywallSource(parsed.paywallSrc) ? parsed.paywallSrc : "nav",
+        productId:
+          typeof parsed.productId === "string" && parsed.productId
+            ? parsed.productId
+            : planAnalytics[parsed.plan].itemId,
+        value:
+          typeof parsed.value === "number" && Number.isFinite(parsed.value)
+            ? parsed.value
+            : planAnalytics[parsed.plan].value,
+        currency: "USD" as const,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function clearCheckoutIntent() {
+    window.sessionStorage.removeItem(checkoutIntentKey);
+  }
+
   function readGuestFreeUsed() {
     if (typeof window === "undefined") return 0;
     const value = Number(window.localStorage.getItem(guestFreeUsedKey) || "0");
@@ -1502,15 +1619,24 @@ export default function TarotApp({
     };
 
     if (checkout === "cancel") {
+      const intent = readCheckoutIntent();
       clearParams();
       window.sessionStorage.removeItem(checkoutResumeKey);
-      track("checkout_cancel", { paywall_src: "checkout_return" });
+      clearCheckoutIntent();
+      const cancelParams: Record<string, unknown> = {
+        paywall_src: intent?.paywallSrc ?? "checkout_return",
+      };
+      if (intent) {
+        Object.assign(cancelParams, planEventParams(intent.plan, intent.productId, intent.value));
+      }
+      track("checkout_cancel", cancelParams);
       window.setTimeout(() => flash("Checkout canceled — you were not charged."), 0);
       return;
     }
 
     if (checkout !== "success") return;
     const sessionId = params.get("session_id") ?? "";
+    const checkoutIntent = readCheckoutIntent();
     clearParams();
 
     const resumeDraw = () => {
@@ -1539,29 +1665,64 @@ export default function TarotApp({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),
         });
-        const data = (await response.json()) as {
-          ok?: boolean;
-          pending?: boolean;
-          error?: string;
-        };
+        const data = (await response.json()) as ConfirmCheckoutResponse;
         await refreshMe();
         setShowPaywall(false);
         setPendingDraw(false);
+        const confirmedPlan = isPlan(data.plan) ? data.plan : checkoutIntent?.plan ?? selectedPlan;
+        const purchaseParams = {
+          checkout_session_id: sessionId,
+          transaction_id: sessionId,
+          subscription_id: data.subscriptionId || "",
+          payment_status: data.status || "",
+          paywall_src: checkoutIntent?.paywallSrc ?? paywallSrc,
+          ...planEventParams(
+            confirmedPlan,
+            data.priceId || checkoutIntent?.productId,
+            data.price ?? checkoutIntent?.value
+          ),
+        };
         if (!response.ok) {
+          track("checkout_error", {
+            ...purchaseParams,
+            step: "confirm_checkout",
+            error_code: response.status,
+            error_message:
+              data.error || "We couldn't confirm this checkout. If you were charged, contact support.",
+          });
+          clearCheckoutIntent();
           flash(data.error || "We couldn't confirm this checkout. If you were charged, contact support.");
           return;
         }
         if (data.ok) {
-          track("checkout_success", {
-            checkout_session_id: sessionId,
-            currency: "USD",
+          track("checkout_success", purchaseParams);
+          track("purchase", {
+            affiliation: "Stripe Checkout",
+            ...purchaseParams,
           });
+          clearCheckoutIntent();
           flash("You're Pro — unlimited readings unlocked.");
           resumeDraw();
         } else {
+          track("checkout_error", {
+            ...purchaseParams,
+            step: "confirm_checkout",
+            error_message: data.pending ? "subscription_pending" : "checkout_not_confirmed",
+          });
+          clearCheckoutIntent();
           flash("Payment received — your membership will activate shortly.");
         }
       } catch {
+        const fallbackPlan = checkoutIntent?.plan ?? selectedPlan;
+        track("checkout_error", {
+          checkout_session_id: sessionId,
+          transaction_id: sessionId,
+          paywall_src: checkoutIntent?.paywallSrc ?? paywallSrc,
+          step: "confirm_checkout",
+          error_message: "network_or_parse_error",
+          ...planEventParams(fallbackPlan, checkoutIntent?.productId, checkoutIntent?.value),
+        });
+        clearCheckoutIntent();
         flash("Payment received — your membership will activate shortly.");
       }
     })();
@@ -1576,14 +1737,16 @@ export default function TarotApp({
     }
     if (!stripeConfig?.enabled || checkoutBusy) return;
 
+    const intent = writeCheckoutIntent(plan);
+    const eventParams = {
+      paywall_src: paywallSrc,
+      ...planEventParams(plan, intent.productId, intent.value),
+    };
     setCheckoutBusy(true);
     setCheckoutMessage("Redirecting to secure checkout…");
-    track("checkout_start", {
-      paywall_src: paywallSrc,
-      product_id: stripeConfig.prices[plan] || plan,
-      price: plan === "year" ? 19.99 : 9.99,
-      currency: "USD",
-    });
+    track("paywall_cta_click", eventParams);
+    track("checkout_start", eventParams);
+    track("begin_checkout", eventParams);
     if (pendingDraw) {
       window.sessionStorage.setItem(
         checkoutResumeKey,
@@ -1601,12 +1764,25 @@ export default function TarotApp({
       if (!response.ok || !data.url) {
         setCheckoutBusy(false);
         setCheckoutMessage(data.error || "Could not start checkout. Please try again.");
+        track("checkout_error", {
+          ...eventParams,
+          step: "create_checkout_session",
+          error_code: response.status,
+          error_message: data.error || "missing_checkout_url",
+        });
+        clearCheckoutIntent();
         return;
       }
       window.location.href = data.url;
-    } catch {
+    } catch (error) {
       setCheckoutBusy(false);
       setCheckoutMessage("Could not start checkout. Please try again.");
+      track("checkout_error", {
+        ...eventParams,
+        step: "create_checkout_session",
+        error_message: error instanceof Error ? error.message : "network_error",
+      });
+      clearCheckoutIntent();
     }
   }
 
@@ -1860,6 +2036,15 @@ export default function TarotApp({
       return;
     }
     goHome();
+  }
+
+  function selectPlan(nextPlan: Plan) {
+    setSelectedPlan(nextPlan);
+    setCheckoutMessage("");
+    track("plan_select", {
+      paywall_src: paywallSrc,
+      ...planEventParams(nextPlan, stripeConfig?.prices[nextPlan]),
+    });
   }
 
   function openSaved(reading: SavedReading) {
@@ -2712,10 +2897,7 @@ export default function TarotApp({
                 <>
                   <button
                     className={`plan-row ${selectedPlan === "quarter" ? "selected" : ""}`}
-                    onClick={() => {
-                      setSelectedPlan("quarter");
-                      setCheckoutMessage("");
-                    }}
+                    onClick={() => selectPlan("quarter")}
                   >
                     <span className="plan-radio" aria-hidden="true">
                       <span />
@@ -2729,10 +2911,7 @@ export default function TarotApp({
                   </button>
                   <button
                     className={`plan-row ${selectedPlan === "year" ? "selected" : ""}`}
-                    onClick={() => {
-                      setSelectedPlan("year");
-                      setCheckoutMessage("");
-                    }}
+                    onClick={() => selectPlan("year")}
                   >
                     <span className="plan-radio" aria-hidden="true">
                       <span />

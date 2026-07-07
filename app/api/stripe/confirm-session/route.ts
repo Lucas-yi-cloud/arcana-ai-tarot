@@ -47,8 +47,9 @@ export async function POST(request: Request) {
     }
 
     const metaPlan = session.metadata?.plan || sub.metadata?.plan;
+    const priceId = priceIdFromSubscription(sub);
     const plan =
-      planFromStripePriceId(priceIdFromSubscription(sub)) ??
+      planFromStripePriceId(priceId) ??
       (metaPlan === "year" || metaPlan === "quarter" ? metaPlan : null);
     if (!plan) return jsonError("Unknown plan for this subscription", 400);
 
@@ -62,6 +63,16 @@ export async function POST(request: Request) {
           : null;
 
     const db = getDb();
+    const successPayload = {
+      ok: true,
+      status: sub.status,
+      plan,
+      priceId: priceId ?? undefined,
+      price: plan === "year" ? 19.99 : 9.99,
+      currency: "USD" as const,
+      subscriptionId: sub.id,
+      customerId,
+    };
 
     const linkExisting = async (id: string, ownerId: string) => {
       if (ownerId !== accountId) return jsonError("Subscription already linked", 409);
@@ -75,7 +86,7 @@ export async function POST(request: Request) {
           updatedAt: now,
         })
         .where(eq(subscriptions.id, id));
-      return Response.json({ ok: true, status: sub.status });
+      return Response.json(successPayload);
     };
 
     const [existing] = await db
@@ -113,7 +124,7 @@ export async function POST(request: Request) {
       return await linkExisting(row.id, row.userId);
     }
 
-    return Response.json({ ok: true, status: sub.status });
+    return Response.json(successPayload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not confirm subscription";
     return jsonError(message, 500);

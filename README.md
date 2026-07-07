@@ -77,6 +77,10 @@ npm run lint
 npm run build
 ```
 
+## Analytics
+
+GA4 conversion events are documented in `docs/ga4-conversion-events.md`.
+
 ## Stripe Setup
 
 In the Stripe Dashboard (Test mode first), create a product with two recurring
