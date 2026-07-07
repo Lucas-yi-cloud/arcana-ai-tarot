@@ -8,6 +8,7 @@ import { jsonError } from "@/lib/security";
 import { deck, spreads } from "@/lib/tarot-data";
 
 type DrawnCardInput = { num?: string; reversed?: boolean };
+type ProfileInput = { readerName?: string; birthDate?: string };
 
 /**
  * Generates the real AI reading for a completed draw and consumes a free read
@@ -17,7 +18,12 @@ type DrawnCardInput = { num?: string; reversed?: boolean };
 export async function POST(request: Request) {
   const user = await getCurrentUser(request);
 
-  let payload: { spreadId?: string; question?: string; cards?: DrawnCardInput[] };
+  let payload: {
+    spreadId?: string;
+    question?: string;
+    profile?: ProfileInput;
+    cards?: DrawnCardInput[];
+  };
   try {
     payload = (await request.json()) as typeof payload;
   } catch {
@@ -53,6 +59,19 @@ export async function POST(request: Request) {
   }
 
   const question = typeof payload.question === "string" ? payload.question.slice(0, 800) : "";
+  const profile =
+    payload.profile && typeof payload.profile === "object"
+      ? {
+          readerName:
+            typeof payload.profile.readerName === "string"
+              ? payload.profile.readerName.trim().slice(0, 40)
+              : "",
+          birthDate:
+            typeof payload.profile.birthDate === "string"
+              ? payload.profile.birthDate.trim().slice(0, 24)
+              : "",
+        }
+      : undefined;
 
   // Reserve a free read ATOMICALLY before generating, so concurrent requests
   // can't each pass an eligibility check against a stale count and bypass the
@@ -80,7 +99,7 @@ export async function POST(request: Request) {
 
   let interpretation;
   try {
-    interpretation = await interpretReading(spread, question, cards);
+    interpretation = await interpretReading(spread, question, cards, profile);
   } catch {
     // Refund the reserved read if generation throws unexpectedly.
     if (user && reserved) {

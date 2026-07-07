@@ -21,7 +21,7 @@ type DrawPhase = "idle" | "shuffling" | "dealt";
 // Legacy Stripe metadata uses these keys:
 // year = Quarterly Pass, quarter = Monthly Pass.
 type Plan = "year" | "quarter";
-type PaywallSource = "nav" | "result" | "draw_limit" | "new_reading";
+type PaywallSource = "nav" | "result" | "draw_limit" | "new_reading" | "followup";
 type TrackEvent =
   | "landing_view"
   | "spread_click"
@@ -123,6 +123,11 @@ type ConfirmCheckoutResponse = {
   currency?: "USD";
   subscriptionId?: string;
   status?: string;
+};
+
+type ReadingProfile = {
+  readerName: string;
+  birthDate: string;
 };
 
 type TarotAppProps = {
@@ -284,10 +289,18 @@ const spreadPrompts: Record<string, string[]> = {
 const googleResumeKey = "arcana.googleLoginResume";
 const checkoutResumeKey = "arcana.checkoutResume";
 const checkoutIntentKey = "arcana.checkoutIntent";
+const pendingSubscribeKey = "arcana.pendingSubscribe";
 const guestFreeUsedKey = "aitarot.freeUsed";
 const pendingSaveKey = "arcana.pendingSave";
 const pendingSavePayloadKey = "arcana.pendingSavePayload";
 const shuffleDurationMs = 5000;
+const dobMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const dobMonthIndexes = dobMonths.map((_, index) => index);
+const dobStartYear = 1940;
+const dobYears = Array.from(
+  { length: new Date().getFullYear() - dobStartYear + 1 },
+  (_, index) => dobStartYear + index
+);
 
 const planAnalytics: Record<
   Plan,
@@ -579,15 +592,182 @@ function ReadingParagraphs({
   );
 }
 
-function ShuffleAnimation({ spread, question }: { spread: Spread; question: string }) {
+function daysInMonth(monthIndex: number, year: number) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function formatBirthDate(monthIndex: number, day: number, year: number) {
+  return `${dobMonths[monthIndex]} ${day}, ${year}`;
+}
+
+function DateWheelColumn<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+  renderOption,
+}: {
+  label: string;
+  options: T[];
+  value: T;
+  onChange: (value: T) => void;
+  renderOption?: (value: T) => string;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const suppressRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const node = scrollRef.current;
+    const selectedIndex = options.findIndex((option) => option === value);
+    if (!node || selectedIndex < 0) return;
+
+    suppressRef.current = true;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        node.scrollTop = selectedIndex * 36;
+        window.setTimeout(() => {
+          suppressRef.current = false;
+        }, 80);
+      });
+    });
+  }, [options, value]);
+
+  function handleScroll() {
+    if (suppressRef.current) return;
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      const node = scrollRef.current;
+      if (!node) return;
+      const nextIndex = Math.min(options.length - 1, Math.max(0, Math.round(node.scrollTop / 36)));
+      const next = options[nextIndex];
+      if (next !== value) onChange(next);
+    }, 90);
+  }
+
+  return (
+    <div className="dob-col-wrap">
+      <span className="sr-only">{label}</span>
+      <div className="dob-col" ref={scrollRef} onScroll={handleScroll} role="listbox" aria-label={label}>
+        <div className="dob-spacer" />
+        {options.map((option) => (
+          <div className="dob-item" key={String(option)} role="option" aria-selected={option === value}>
+            {renderOption ? renderOption(option) : option}
+          </div>
+        ))}
+        <div className="dob-spacer" />
+      </div>
+    </div>
+  );
+}
+
+function PersonalizationCard({
+  readerName,
+  birthMonth,
+  birthDay,
+  birthYear,
+  onReaderNameChange,
+  onBirthMonthChange,
+  onBirthDayChange,
+  onBirthYearChange,
+}: {
+  readerName: string;
+  birthMonth: number;
+  birthDay: number;
+  birthYear: number;
+  onReaderNameChange: (value: string) => void;
+  onBirthMonthChange: (value: number) => void;
+  onBirthDayChange: (value: number) => void;
+  onBirthYearChange: (value: number) => void;
+}) {
+  const dayOptions = useMemo(
+    () => Array.from({ length: daysInMonth(birthMonth, birthYear) }, (_, index) => index + 1),
+    [birthMonth, birthYear]
+  );
+
+  return (
+    <section className="personal-card" aria-label="Personalise your reading">
+      <div className="personal-head">
+        <svg
+          width="17"
+          height="17"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="8" r="3.3" />
+          <path d="M5.5 20a6.8 6.8 0 0 1 13 0" />
+        </svg>
+        <strong>Personalise your reading</strong>
+      </div>
+      <p>Your details attune the spread to you. This stays private to your reading.</p>
+      <div className="personal-fields">
+        <label>
+          <span>Your name</span>
+          <input
+            className="field"
+            value={readerName}
+            onChange={(event) => onReaderNameChange(event.target.value)}
+            placeholder="e.g. Maya"
+            maxLength={40}
+          />
+        </label>
+        <label>
+          <span>
+            Date of birth <em>· optional</em>
+          </span>
+          <div className="dob-wheel" aria-label={formatBirthDate(birthMonth, birthDay, birthYear)}>
+            <div className="dob-selection" aria-hidden="true" />
+            <div className="dob-fade top" aria-hidden="true" />
+            <DateWheelColumn
+              label="Birth month"
+              options={dobMonthIndexes}
+              value={birthMonth}
+              onChange={onBirthMonthChange}
+              renderOption={(value) => dobMonths[value]}
+            />
+            <DateWheelColumn
+              label="Birth day"
+              options={dayOptions}
+              value={birthDay}
+              onChange={onBirthDayChange}
+            />
+            <DateWheelColumn
+              label="Birth year"
+              options={dobYears}
+              value={birthYear}
+              onChange={onBirthYearChange}
+            />
+            <div className="dob-fade bottom" aria-hidden="true" />
+          </div>
+        </label>
+      </div>
+    </section>
+  );
+}
+
+function ShuffleAnimation({
+  spread,
+  question,
+  readerName,
+}: {
+  spread: Spread;
+  question: string;
+  readerName: string;
+}) {
   const mode = question.trim() ? "Your question" : "A general reading";
+  const firstName = readerName.trim().split(/\s+/)[0];
 
   return (
     <div className="shuffle-scene" role="status" aria-live="polite">
       <p className="shuffle-kicker">
         {spread.name} · {mode}
       </p>
-      <h1 className="serif">Focus on your question...</h1>
+      <h1 className="serif">{firstName ? `${firstName}, focus on your question...` : "Focus on your question..."}</h1>
       <div className="shuffle-dots" aria-hidden="true">
         <span />
         <span />
@@ -1245,6 +1425,10 @@ export default function TarotApp({
     spreads.some((item) => item.id === initialSpreadId) ? initialSpreadId : spreads[0].id
   );
   const [question, setQuestion] = useState("");
+  const [readerName, setReaderName] = useState("");
+  const [birthMonth, setBirthMonth] = useState(5);
+  const [birthDay, setBirthDay] = useState(15);
+  const [birthYear, setBirthYear] = useState(1995);
   const [cards, setCards] = useState<DrawnCard[]>([]);
   const [drawPhase, setDrawPhase] = useState<DrawPhase>("idle");
   const [user, setUser] = useState<User | null>(null);
@@ -1279,6 +1463,23 @@ export default function TarotApp({
     () => spreads.find((item) => item.id === spreadId) ?? spreads[0],
     [spreadId]
   );
+  const readingProfile = useMemo<ReadingProfile>(
+    () => ({
+      readerName: readerName.trim(),
+      birthDate: formatBirthDate(birthMonth, birthDay, birthYear),
+    }),
+    [birthDay, birthMonth, birthYear, readerName]
+  );
+
+  function updateBirthMonth(nextMonth: number) {
+    setBirthMonth(nextMonth);
+    setBirthDay((current) => Math.min(current, daysInMonth(nextMonth, birthYear)));
+  }
+
+  function updateBirthYear(nextYear: number) {
+    setBirthYear(nextYear);
+    setBirthDay((current) => Math.min(current, daysInMonth(birthMonth, nextYear)));
+  }
 
   function pushRoutePath(nextRoute: Route, nextSpread = spread) {
     const nextPath = routePath(nextRoute, nextSpread);
@@ -1340,7 +1541,13 @@ export default function TarotApp({
   }
 
   function isPaywallSource(value: unknown): value is PaywallSource {
-    return value === "nav" || value === "result" || value === "draw_limit" || value === "new_reading";
+    return (
+      value === "nav" ||
+      value === "result" ||
+      value === "draw_limit" ||
+      value === "new_reading" ||
+      value === "followup"
+    );
   }
 
   function planEventParams(plan: Plan, productId?: string, price?: number) {
@@ -1367,11 +1574,11 @@ export default function TarotApp({
     };
   }
 
-  function writeCheckoutIntent(plan: Plan) {
+  function writeCheckoutIntent(plan: Plan, source: PaywallSource = paywallSrc) {
     const meta = planAnalytics[plan];
     const intent: CheckoutIntent = {
       plan,
-      paywallSrc,
+      paywallSrc: source,
       productId: stripeConfig?.prices[plan] || meta.itemId,
       value: meta.value,
       currency: "USD",
@@ -1730,21 +1937,72 @@ export default function TarotApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function startCheckout(plan: Plan) {
+  useEffect(() => {
+    if (!user || !stripeConfig?.enabled) return;
+    const raw = window.sessionStorage.getItem(pendingSubscribeKey);
+    if (!raw) return;
+    window.sessionStorage.removeItem(pendingSubscribeKey);
+
+    try {
+      const pending = JSON.parse(raw) as {
+        plan?: unknown;
+        paywallSrc?: unknown;
+        pendingDraw?: unknown;
+        spreadId?: unknown;
+        question?: unknown;
+      };
+      const plan = isPlan(pending.plan) ? pending.plan : selectedPlan;
+      const source = isPaywallSource(pending.paywallSrc) ? pending.paywallSrc : paywallSrc;
+      if (pending.pendingDraw) {
+        window.sessionStorage.setItem(
+          checkoutResumeKey,
+          JSON.stringify({
+            pendingDraw: true,
+            spreadId: typeof pending.spreadId === "string" ? pending.spreadId : spreadId,
+            question: typeof pending.question === "string" ? pending.question : question,
+          })
+        );
+      }
+      window.setTimeout(() => {
+        setSelectedPlan(plan);
+        setPaywallSrc(source);
+        setShowPaywall(true);
+        setCheckoutMessage("Continuing to secure checkout...");
+        window.setTimeout(() => void startCheckout(plan, { resumed: true, source }), 180);
+      }, 0);
+    } catch {
+      window.sessionStorage.removeItem(pendingSubscribeKey);
+    }
+    // This resumes a subscription intent after Google or email login.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, stripeConfig?.enabled]);
+
+  async function startCheckout(
+    plan: Plan,
+    options: { resumed?: boolean; source?: PaywallSource } = {}
+  ) {
+    if (!stripeConfig?.enabled || checkoutBusy) return;
+
+    const source = options.source ?? paywallSrc;
+    const intent = writeCheckoutIntent(plan, source);
+    const eventParams = {
+      paywall_src: source,
+      ...planEventParams(plan, intent.productId, intent.value),
+    };
+    if (!options.resumed) track("paywall_cta_click", eventParams);
+
     if (!user) {
+      window.sessionStorage.setItem(
+        pendingSubscribeKey,
+        JSON.stringify({ plan, paywallSrc: source, pendingDraw, spreadId, question })
+      );
+      setCheckoutMessage("Sign in first, then we will continue to secure checkout.");
       openLogin("checkout");
       return;
     }
-    if (!stripeConfig?.enabled || checkoutBusy) return;
 
-    const intent = writeCheckoutIntent(plan);
-    const eventParams = {
-      paywall_src: paywallSrc,
-      ...planEventParams(plan, intent.productId, intent.value),
-    };
     setCheckoutBusy(true);
     setCheckoutMessage("Redirecting to secure checkout…");
-    track("paywall_cta_click", eventParams);
     track("checkout_start", eventParams);
     track("begin_checkout", eventParams);
     if (pendingDraw) {
@@ -1876,6 +2134,7 @@ export default function TarotApp({
         body: JSON.stringify({
           spreadId: spread.id,
           question,
+          profile: readingProfile,
           cards: cards.map((card) => ({ num: card.num, reversed: card.reversed })),
         }),
       });
@@ -2410,6 +2669,16 @@ export default function TarotApp({
                 </button>
               ))}
             </div>
+            <PersonalizationCard
+              readerName={readerName}
+              birthMonth={birthMonth}
+              birthDay={birthDay}
+              birthYear={birthYear}
+              onReaderNameChange={setReaderName}
+              onBirthMonthChange={updateBirthMonth}
+              onBirthDayChange={setBirthDay}
+              onBirthYearChange={updateBirthYear}
+            />
             <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
               <button className="primary-btn" onClick={() => void beginDraw()}>
                 Shuffle & draw
@@ -2425,7 +2694,7 @@ export default function TarotApp({
       {route === "draw" && (
         drawPhase === "shuffling" ? (
           <main className="shuffle-page starfield">
-            <ShuffleAnimation spread={spread} question={question} />
+            <ShuffleAnimation spread={spread} question={question} readerName={readerName} />
           </main>
         ) : (
           <main className="page">
@@ -2599,6 +2868,59 @@ export default function TarotApp({
                 </div>
                 <ReadingParagraphs className="reading-synthesis serif" text={aiSynthesis || synthesis} />
               </section>
+
+              {!isSubscribed && (
+                <section className="followup-card" aria-label="Ask a follow-up question">
+                  <div className="followup-head">
+                    <div>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                      </svg>
+                      <strong>Ask a follow-up question</strong>
+                    </div>
+                    <span className="followup-pro">PRO</span>
+                  </div>
+                  <div className="followup-input-row">
+                    <button className="followup-field" onClick={() => openPaywall("followup")}>
+                      e.g. What should I focus on next?
+                    </button>
+                    <button
+                      className="followup-send"
+                      aria-label="Unlock follow-up questions"
+                      onClick={() => openPaywall("followup")}
+                    >
+                      <svg
+                        width="19"
+                        height="19"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M22 2 11 13" />
+                        <path d="m22 2-7 20-4-9-9-4 20-7z" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p>
+                    Keep the conversation going with your cards — unlimited follow-ups are included
+                    with Arcana Pro.
+                  </p>
+                </section>
+              )}
 
               <div className="result-actions">
                 <button className="result-action-btn" disabled={saving} onClick={() => void saveReading()}>
@@ -2796,6 +3118,8 @@ export default function TarotApp({
                 setAuthOpen(false);
                 setPendingDraw(false);
                 setPendingSave(false);
+                window.sessionStorage.removeItem(pendingSubscribeKey);
+                clearCheckoutIntent();
               }}
             >
               ✕
@@ -2883,64 +3207,55 @@ export default function TarotApp({
               </div>
             </div>
             <div className="modal-body">
+              <button
+                className={`plan-row ${selectedPlan === "quarter" ? "selected" : ""}`}
+                onClick={() => selectPlan("quarter")}
+              >
+                <span className="plan-radio" aria-hidden="true">
+                  <span />
+                </span>
+                <span>
+                  <strong>Monthly Pass</strong>
+                  <br />
+                  <small>30 days · unlimited readings · ≈ $0.33 / day</small>
+                </span>
+                <span className="tag">POPULAR</span>
+              </button>
+              <button
+                className={`plan-row ${selectedPlan === "year" ? "selected" : ""}`}
+                onClick={() => selectPlan("year")}
+              >
+                <span className="plan-radio" aria-hidden="true">
+                  <span />
+                </span>
+                <span>
+                  <strong>Quarterly Pass</strong>
+                  <br />
+                  <small>90 days · unlimited readings · ≈ $6.66 / mo</small>
+                </span>
+                <span className="tag">BEST VALUE</span>
+              </button>
+              {!stripeConfig?.enabled && (
+                <p className="message error">
+                  Stripe is not configured yet. Add the secret key, webhook secret, and both
+                  price IDs to the runtime environment.
+                </p>
+              )}
               {!user && (
-                <>
-                  <p className="message" style={{ marginTop: 0 }}>
-                    Sign in first so your subscription is linked to the right account.
-                  </p>
-                  <button className="primary-btn" onClick={() => openLogin("paywall")}>
-                    Sign in
-                  </button>
-                </>
+                <p className="message" style={{ marginTop: 0 }}>
+                  You&apos;ll sign in first so your subscription is linked to the right account.
+                </p>
               )}
-              {user && (
-                <>
-                  <button
-                    className={`plan-row ${selectedPlan === "quarter" ? "selected" : ""}`}
-                    onClick={() => selectPlan("quarter")}
-                  >
-                    <span className="plan-radio" aria-hidden="true">
-                      <span />
-                    </span>
-                    <span>
-                      <strong>Monthly Pass</strong>
-                      <br />
-                      <small>30 days · unlimited readings · ≈ $0.33 / day</small>
-                    </span>
-                    <span className="tag">POPULAR</span>
-                  </button>
-                  <button
-                    className={`plan-row ${selectedPlan === "year" ? "selected" : ""}`}
-                    onClick={() => selectPlan("year")}
-                  >
-                    <span className="plan-radio" aria-hidden="true">
-                      <span />
-                    </span>
-                    <span>
-                      <strong>Quarterly Pass</strong>
-                      <br />
-                      <small>90 days · unlimited readings · ≈ $6.66 / mo</small>
-                    </span>
-                    <span className="tag">BEST VALUE</span>
-                  </button>
-                  {!stripeConfig?.enabled && (
-                    <p className="message error">
-                      Stripe is not configured yet. Add the secret key, webhook secret, and both
-                      price IDs to the runtime environment.
-                    </p>
-                  )}
-                  <button
-                    className="primary-btn"
-                    disabled={!stripeConfig?.enabled || checkoutBusy}
-                    onClick={() => void startCheckout(selectedPlan)}
-                    aria-label={`Subscribe to the ${planName} with Stripe`}
-                  >
-                    {checkoutBusy ? "Redirecting…" : `Continue — ${planPrice}`}
-                  </button>
-                  {checkoutMessage && <p className="message">{checkoutMessage}</p>}
-                  <p className="secure-line">🔒 Secure Stripe checkout · Cancel anytime</p>
-                </>
-              )}
+              <button
+                className="primary-btn"
+                disabled={!stripeConfig?.enabled || checkoutBusy}
+                onClick={() => void startCheckout(selectedPlan)}
+                aria-label={user ? `Subscribe to the ${planName} with Stripe` : "Continue with Arcana Pro"}
+              >
+                {checkoutBusy ? "Redirecting…" : user ? `Continue — ${planPrice}` : "Continue with Pro"}
+              </button>
+              {checkoutMessage && <p className="message">{checkoutMessage}</p>}
+              <p className="secure-line">Secure Stripe checkout · Cancel anytime</p>
             </div>
           </section>
         </div>

@@ -47,6 +47,11 @@ export type ReadingInterpretation = {
   model: string;
 };
 
+export type ReadingProfile = {
+  readerName?: string;
+  birthDate?: string;
+};
+
 const SYSTEM_PROMPT = [
   "You are Arcana AI, a thoughtful tarot reader working with the Rider-Waite-Smith Major Arcana.",
   "Treat tarot as a mirror for reflection, not fixed prediction or fortune-telling.",
@@ -148,7 +153,28 @@ function questionBindingProtocol(spread: Spread, trimmedQuestion: string) {
   ].join("\n");
 }
 
-function buildUserPrompt(spread: Spread, question: string, cards: DrawInput[]) {
+function profileLines(profile?: ReadingProfile) {
+  const name = profile?.readerName?.trim();
+  const birthDate = profile?.birthDate?.trim();
+  if (!name && !birthDate) {
+    return "Personalisation context: none provided.";
+  }
+
+  return [
+    "Personalisation context:",
+    name ? `- The seeker gave their first/name field as "${name}". You may address them by name once, naturally, but do not overuse it.` : "- The seeker did not provide a name.",
+    birthDate
+      ? `- The seeker selected date of birth "${birthDate}". Use it only as a quiet personal anchor for tone; do not make astrology, numerology, medical, or fate claims from it.`
+      : "- The seeker did not provide a date of birth.",
+  ].join("\n");
+}
+
+function buildUserPrompt(
+  spread: Spread,
+  question: string,
+  cards: DrawInput[],
+  profile?: ReadingProfile
+) {
   const trimmed = question.trim();
   const cardLines = cards
     .map((card, index) => {
@@ -164,6 +190,7 @@ function buildUserPrompt(spread: Spread, question: string, cards: DrawInput[]) {
   return [
     `Spread: ${spread.name} — ${spread.blurb}`,
     trimmed ? `Exact seeker question: "${trimmed}"` : "The seeker did not provide a specific question; read for the season they are in.",
+    profileLines(profile),
     "",
     "Cards drawn (in position order):",
     cardLines,
@@ -223,9 +250,11 @@ function ensureParagraphs(text: string, preferredParagraphs: number) {
 export function deterministicInterpretation(
   spread: Spread,
   question: string,
-  cards: DrawInput[]
+  cards: DrawInput[],
+  profile?: ReadingProfile
 ): ReadingInterpretation {
   const trimmedQuestion = question.trim();
+  const name = profile?.readerName?.trim().split(/\s+/)[0];
   const focus = trimmedQuestion ? `your question — "${trimmedQuestion}"` : "this open reading";
   const cardOut: CardInterpretation[] = cards.map((card) => {
     const words = keywords(card);
@@ -248,7 +277,9 @@ export function deterministicInterpretation(
   const firstWord = keywords(first)[0];
   const lastWord = keywords(last)[0];
   const opener = trimmedQuestion
-    ? `On "${trimmedQuestion}", the deck answers in layers rather than with a guarantee.`
+    ? name
+      ? `${name}, on "${trimmedQuestion}", the deck answers in layers rather than with a guarantee.`
+      : `On "${trimmedQuestion}", the deck answers in layers rather than with a guarantee.`
     : "Without a fixed question, the cards read the season you are in.";
 
   let synthesis: string;
@@ -396,12 +427,13 @@ function isValidReading(parsed: ParsedReading | null, count: number): boolean {
 export async function interpretReading(
   spread: Spread,
   question: string,
-  cards: DrawInput[]
+  cards: DrawInput[],
+  profile?: ReadingProfile
 ): Promise<ReadingInterpretation> {
   const env = getAppEnv();
   const provider = selectProvider(env);
   if (!provider) {
-    return deterministicInterpretation(spread, question, cards);
+    return deterministicInterpretation(spread, question, cards, profile);
   }
 
   const call = (prompt: string) =>
@@ -409,7 +441,7 @@ export async function interpretReading(
       () => null
     );
 
-  const userPrompt = buildUserPrompt(spread, question, cards);
+  const userPrompt = buildUserPrompt(spread, question, cards, profile);
 
   let result = await call(userPrompt);
   let parsed = result ? extractJson(result.text) : null;
@@ -432,7 +464,7 @@ export async function interpretReading(
   }
 
   if (!result || !parsed || !isValidReading(parsed, cards.length)) {
-    return deterministicInterpretation(spread, question, cards);
+    return deterministicInterpretation(spread, question, cards, profile);
   }
 
   const cardOut: CardInterpretation[] = cards.map((card, index) => {
@@ -440,7 +472,7 @@ export async function interpretReading(
     const safe =
       typeof text === "string" && text.trim()
         ? ensureParagraphs(text, 2)
-        : deterministicInterpretation(spread, question, [card]).cards[0].text;
+        : deterministicInterpretation(spread, question, [card], profile).cards[0].text;
     return {
       num: card.num,
       name: card.name,
