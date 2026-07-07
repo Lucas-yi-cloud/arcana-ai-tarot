@@ -143,6 +143,14 @@ const defaultPrompts = [
   "What is the smartest next step to take?",
 ];
 
+const reflectivePrompts = [
+  "What should I understand before I choose?",
+  "What is the lesson in this situation?",
+  "What would help me move with more clarity?",
+  "What am I ready to release?",
+  "What should I focus on next?",
+];
+
 const spreadPrompts: Record<string, string[]> = {
   daily: [
     "What energy should I carry into today?",
@@ -750,6 +758,251 @@ function PersonalizationCard({
   );
 }
 
+function SmallMoonIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path
+        d="M24 17.5A9 9 0 1 1 14.5 8a7 7 0 0 0 9.5 9.5Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      <circle cx="22" cy="9" r="1.1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function detailDiagramHeight(spread: Spread) {
+  if (spread.count >= 10) return 480;
+  if (spread.count >= 7) return 380;
+  if (spread.count >= 5) return 330;
+  return 260;
+}
+
+function detailLayoutScale(spread: Spread) {
+  if (spread.count === 1) return 1.7;
+  if (spread.count >= 10) return 0.56;
+  if (spread.count >= 7) return 0.68;
+  if (spread.count >= 5) return 0.86;
+  return 1;
+}
+
+function SpreadLayoutInfoCard({ spread }: { spread: Spread }) {
+  const height = detailDiagramHeight(spread);
+  const scale = detailLayoutScale(spread);
+
+  return (
+    <section className="detail-layout-card">
+      <div className="detail-layout-stage starfield">
+        <span className="detail-stage-label">SPREAD LAYOUT</span>
+        <span className="detail-layout-glow" aria-hidden="true" />
+        <div className="detail-layout-area" style={{ height }}>
+          {spread.positions.map((position, index) => (
+            <div
+              className="detail-layout-position"
+              key={position.label}
+              style={{
+                left: `${position.x}%`,
+                top: `${position.y}%`,
+                transform: `translate(-50%, -50%) rotate(${position.rot ?? 0}deg) scale(${scale})`,
+              }}
+            >
+              <div className="detail-layout-mini">
+                <span className="serif">{index + 1}</span>
+              </div>
+              <em>{position.label}</em>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="detail-layout-body">
+        <p>
+          <strong>Good for:</strong> {spread.good}
+        </p>
+        <div className="position-list detail-position-list">
+          <span>THE POSITIONS</span>
+          {spread.positions.map((position, index) => (
+            <div className="position-row" key={position.label}>
+              <b>{index + 1}</b>
+              <div>
+                <strong>{position.label}</strong>
+                <p>{position.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DetailAskCard({
+  question,
+  prompts,
+  readerName,
+  birthMonth,
+  birthDay,
+  birthYear,
+  status,
+  onQuestionChange,
+  onPromptPick,
+  onReaderNameChange,
+  onBirthMonthChange,
+  onBirthDayChange,
+  onBirthYearChange,
+  onBeginDraw,
+}: {
+  question: string;
+  prompts: string[];
+  readerName: string;
+  birthMonth: number;
+  birthDay: number;
+  birthYear: number;
+  status: string;
+  onQuestionChange: (value: string) => void;
+  onPromptPick: (value: string) => void;
+  onReaderNameChange: (value: string) => void;
+  onBirthMonthChange: (value: number) => void;
+  onBirthDayChange: (value: number) => void;
+  onBirthYearChange: (value: number) => void;
+  onBeginDraw: () => void;
+}) {
+  const dayOptions = useMemo(
+    () => Array.from({ length: daysInMonth(birthMonth, birthYear) }, (_, index) => index + 1),
+    [birthMonth, birthYear]
+  );
+  const disabled = question.trim().length === 0;
+
+  return (
+    <section className="detail-ask-card" aria-label="Start this tarot reading">
+      <div className="detail-ask-head">
+        <SmallMoonIcon />
+        <span>What&apos;s on your mind?</span>
+      </div>
+      <textarea
+        className="detail-ask-textarea"
+        value={question}
+        onChange={(event) => onQuestionChange(event.target.value)}
+        placeholder="Type your question for the cards…"
+      />
+      <div className="detail-prompt-strip">
+        {prompts.map((prompt) => (
+          <button type="button" key={prompt} onClick={() => onPromptPick(prompt)}>
+            {prompt}
+          </button>
+        ))}
+      </div>
+      <label className="detail-ask-label">
+        <span>
+          Your name <em>· optional, personalises the reading</em>
+        </span>
+        <input
+          value={readerName}
+          onChange={(event) => onReaderNameChange(event.target.value)}
+          placeholder="e.g. Ava"
+          maxLength={40}
+        />
+      </label>
+      <label className="detail-ask-label">
+        <span>
+          Date of birth <em>· optional</em>
+        </span>
+        <div className="dob-wheel detail-dob-wheel" aria-label={formatBirthDate(birthMonth, birthDay, birthYear)}>
+          <div className="dob-selection" aria-hidden="true" />
+          <div className="dob-fade top" aria-hidden="true" />
+          <DateWheelColumn
+            label="Birth month"
+            options={dobMonthIndexes}
+            value={birthMonth}
+            onChange={onBirthMonthChange}
+            renderOption={(value) => dobMonths[value]}
+          />
+          <DateWheelColumn
+            label="Birth day"
+            options={dayOptions}
+            value={birthDay}
+            onChange={onBirthDayChange}
+          />
+          <DateWheelColumn
+            label="Birth year"
+            options={dobYears}
+            value={birthYear}
+            onChange={onBirthYearChange}
+          />
+          <div className="dob-fade bottom" aria-hidden="true" />
+        </div>
+      </label>
+      <button className="detail-draw-btn" type="button" disabled={disabled} onClick={onBeginDraw}>
+        <span>Shuffle &amp; draw this spread</span>
+        <svg
+          viewBox="0 0 24 24"
+          width="17"
+          height="17"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </button>
+      <p className="detail-status">{disabled ? "Enter your question to begin." : status}</p>
+    </section>
+  );
+}
+
+function RelatedSpreads({
+  spread,
+  onOpenSpread,
+  onGoHome,
+}: {
+  spread: Spread;
+  onOpenSpread: (id: string) => void;
+  onGoHome: () => void;
+}) {
+  const index = Math.max(0, spreads.findIndex((item) => item.id === spread.id));
+  const related = Array.from({ length: Math.min(6, spreads.length - 1) }, (_, offset) => {
+    const nextIndex = (index + offset + 1) % spreads.length;
+    return spreads[nextIndex];
+  });
+
+  return (
+    <nav className="related-spreads" aria-label="Other tarot spreads">
+      <div className="related-spreads-head">
+        <h2>Explore other spreads</h2>
+        <button type="button" onClick={onGoHome}>
+          All {spreads.length} spreads
+          <svg
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+      </div>
+      <div className="related-spread-grid">
+        {related.map((item) => (
+          <button type="button" key={item.id} onClick={() => onOpenSpread(item.id)}>
+            <div>
+              <strong>{item.name}</strong>
+              <span>
+                {item.count} {item.count === 1 ? "card" : "cards"}
+              </span>
+            </div>
+            <p>{item.blurb}</p>
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 function QuestionMoonIcon() {
   return (
     <div className="question-icon" aria-hidden="true">
@@ -1165,24 +1418,6 @@ function SpreadSeoContent({ spread }: { spread: Spread }) {
   );
 }
 
-function SpreadBreadcrumb({
-  spread,
-  onGoHome,
-}: {
-  spread: Spread;
-  onGoHome: () => void;
-}) {
-  return (
-    <nav className="breadcrumb" aria-label="Breadcrumb">
-      <button onClick={onGoHome}>Home</button>
-      <span aria-hidden="true">›</span>
-      <button onClick={onGoHome}>Spreads</button>
-      <span aria-hidden="true">›</span>
-      <strong>{spread.name}</strong>
-    </nav>
-  );
-}
-
 function SpreadReviewNote() {
   return (
     <aside className="review-note">
@@ -1516,7 +1751,7 @@ export default function TarotApp({
 
   const synthesis = useMemo(() => getSynthesis(cards, question, spread), [cards, question, spread]);
   const questionPrompts = useMemo(
-    () => spreadPrompts[spread.id] ?? defaultPrompts,
+    () => [...new Set([...(spreadPrompts[spread.id] ?? defaultPrompts), ...reflectivePrompts])],
     [spread.id]
   );
   const userStatus = user?.subscribed ? "pro" : user ? "free" : "guest";
@@ -2082,6 +2317,10 @@ export default function TarotApp({
     }, 0);
   }
 
+  function startFreeReading() {
+    openSpread("past-present-future");
+  }
+
   function goRoute(nextRoute: Route) {
     setRoute(nextRoute);
     pushRoutePath(nextRoute);
@@ -2104,11 +2343,15 @@ export default function TarotApp({
   }
 
   async function beginDraw() {
-    if (route === "question") {
-      track("question_submit", {
-        question_length: question.trim().length,
-      });
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion) {
+      flash("Please enter your question first.");
+      return;
     }
+    track("question_submit", {
+      question_length: trimmedQuestion.length,
+      source: route === "detail" ? "detail_ask" : route,
+    });
 
     if (!isSubscribed && effectiveFreeUsed >= freeLimit) {
       setPendingDraw(true);
@@ -2356,12 +2599,12 @@ export default function TarotApp({
           >
             Spreads
           </button>
-          <button
-            className={`nav-pill ${route === "history" ? "active" : ""}`}
-            onClick={() => goRoute("history")}
-          >
-            Journals
-          </button>
+	          <button
+	            className={`nav-pill ${route === "history" ? "active" : ""}`}
+	            onClick={() => goRoute("history")}
+	          >
+	            Readings
+	          </button>
         </div>
         <div className="account-actions">
           {user?.subscribed ? (
@@ -2479,17 +2722,22 @@ export default function TarotApp({
                 {" "}
                 <span style={{ color: "#e0d8ff", fontStyle: "italic" }}>already know.</span>
               </h1>
-              <p>
-                Choose a spread, hold your question, and let an AI reader interpret the
-                Rider-Waite deck just for you.
-              </p>
-              <button
-                className="white-btn"
-                onClick={beginAtSpreads}
-              >
-                Begin a reading →
-              </button>
-            </div>
+	              <p>
+	                Hold your question, draw the Rider-Waite deck, and get a clear, personal
+	                reading in under a minute — no sign-up needed.
+	              </p>
+	              <button
+	                className="white-btn"
+	                onClick={startFreeReading}
+	              >
+	                Start a free reading →
+	              </button>
+	              <div className="hero-trust" aria-label="Reading benefits">
+	                <span>First reading free</span>
+	                <span>No sign-up to start</span>
+	                <span>Real Rider-Waite deck</span>
+	              </div>
+	            </div>
             <div className="hero-fan" aria-hidden="true">
               <div className="hero-aura" />
               <div className="fan-float">
@@ -2520,11 +2768,11 @@ export default function TarotApp({
 
           <div className="section-head" id="spreads">
             <h2>Choose your spread</h2>
-            <span>
-              {user
-                ? membershipCaption(user, freeLimit)
-                : `${freeReadingsLeft} free reading${freeReadingsLeft === 1 ? "" : "s"} available`}
-            </span>
+	            <span>
+	              {user
+	                ? membershipCaption(user, freeLimit)
+	                : "Choose a spread to begin your reading"}
+	            </span>
           </div>
           <div className="spread-grid">
             {spreads.map((item) => (
@@ -2571,80 +2819,55 @@ export default function TarotApp({
         </main>
       )}
 
-      {route === "detail" && (
-        <main className="page">
-          <SpreadBreadcrumb spread={spread} onGoHome={goHome} />
-          <div className="detail-grid" style={{ marginTop: 22 }}>
-            <section className="stage layout-panel starfield">
-              <span className="preview-label">SPREAD LAYOUT</span>
-              <div className="layout-area">
-                {spread.positions.map((position, index) => (
-                  <div
-                    className="layout-card"
-                    key={position.label}
-                    style={{
-                      left: `${position.x}%`,
-                      top: `${position.y}%`,
-                      transform: `translate(-50%, -50%) rotate(${position.rot ?? 0}deg) scale(${
-                        spread.count >= 10 ? 0.56 : spread.count >= 6 ? 0.78 : spread.count >= 5 ? 0.88 : 1
-                      })`,
-                    }}
-                  >
-                    <span className="serif">{index + 1}</span>
-                    <em>{position.label}</em>
-                  </div>
-                ))}
-              </div>
-            </section>
-            <section>
-              <h1 className="serif detail-title">{spread.name}</h1>
-              <div className="detail-meta">
-                <span>
-                  {spread.count} {spread.count === 1 ? "card" : "cards"}
-                </span>
-                {user?.subscribed && <b>UNLIMITED</b>}
-              </div>
-              <p style={{ fontSize: 16, lineHeight: 1.6 }}>{spread.blurb}</p>
-              <p style={{ color: "var(--muted)", lineHeight: 1.5 }}>
-                <strong style={{ color: "var(--ink)" }}>Good for:</strong> {spread.good}
-              </p>
-              <div className="position-list">
-                {spread.positions.map((position, index) => (
-                  <div className="position-row" key={position.label}>
-                    <b>{index + 1}</b>
-                    <div>
-                      <strong>{position.label}</strong>
-                      <p style={{ margin: "3px 0 0", color: "var(--soft)", fontSize: 13 }}>
-                        {position.desc}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button
-                className="primary-btn"
-                style={{ width: "100%", borderRadius: 16 }}
-                onClick={() => setRoute("question")}
-              >
-                Ask your question
-              </button>
-              <p className="message">
-                {user?.subscribed
-                  ? `Unlimited readings with your ${user.membership.label}.`
-                  : "Hold your question in mind as you draw."}
-              </p>
-            </section>
-          </div>
-          <SpreadSeoContent spread={spread} />
-          <SpreadReviewNote />
-          <SiteFooter
-            onOpenSpread={openSpread}
-            onGoHome={beginAtSpreads}
-            onOpenPaywall={() => openPaywall("nav")}
-            onRoute={goRoute}
-          />
-        </main>
-      )}
+	      {route === "detail" && (
+	        <main className="page detail-page">
+	          <button className="detail-back-link" onClick={beginAtSpreads}>
+	            ‹ All spreads
+	          </button>
+	          <header className="detail-header">
+	            <h1 className="serif detail-title">{spread.name}</h1>
+	            <div className="detail-meta">
+	              <span>
+	                {spread.count} {spread.count === 1 ? "card" : "cards"}
+	              </span>
+	              {user?.subscribed && <b>UNLIMITED</b>}
+	            </div>
+	            <p>{spread.blurb}</p>
+	          </header>
+	          <div className="detail-start-grid">
+	            <SpreadLayoutInfoCard spread={spread} />
+	            <DetailAskCard
+	              question={question}
+	              prompts={questionPrompts}
+	              readerName={readerName}
+	              birthMonth={birthMonth}
+	              birthDay={birthDay}
+	              birthYear={birthYear}
+	              status={
+	                user?.subscribed
+	                  ? `Unlimited readings with your ${user.membership.label}.`
+	                  : `${freeReadingsLeft} free reading${freeReadingsLeft === 1 ? "" : "s"} left`
+	              }
+	              onQuestionChange={setQuestion}
+	              onPromptPick={setQuestion}
+	              onReaderNameChange={setReaderName}
+	              onBirthMonthChange={updateBirthMonth}
+	              onBirthDayChange={setBirthDay}
+	              onBirthYearChange={updateBirthYear}
+	              onBeginDraw={() => void beginDraw()}
+	            />
+	          </div>
+	          <RelatedSpreads spread={spread} onOpenSpread={openSpread} onGoHome={beginAtSpreads} />
+	          <SpreadSeoContent spread={spread} />
+	          <SpreadReviewNote />
+	          <SiteFooter
+	            onOpenSpread={openSpread}
+	            onGoHome={beginAtSpreads}
+	            onOpenPaywall={() => openPaywall("nav")}
+	            onRoute={goRoute}
+	          />
+	        </main>
+	      )}
 
       {route === "question" && (
         <main className="question-page">
@@ -3057,8 +3280,8 @@ export default function TarotApp({
 
       {route === "contact" && <ContactPage onBack={goHome} />}
 
-      <nav className="mobile-tabbar" aria-label="Mobile navigation">
-        <button className={route !== "history" ? "active" : ""} onClick={goHome}>
+	      <nav className="mobile-tabbar" aria-label="Mobile navigation">
+	        <button className={route !== "history" ? "active" : ""} onClick={goHome}>
           <svg
             width="22"
             height="22"
@@ -3075,9 +3298,9 @@ export default function TarotApp({
             <rect x="4" y="14" width="6" height="6" rx="1.2" />
             <rect x="14" y="14" width="6" height="6" rx="1.2" />
           </svg>
-          <span>Spreads</span>
-        </button>
-        <button className={route === "history" ? "active" : ""} onClick={() => goRoute("history")}>
+	          <span>Home</span>
+	        </button>
+	        <button className={route === "history" ? "active" : ""} onClick={() => goRoute("history")}>
           <svg
             width="22"
             height="22"
@@ -3091,35 +3314,9 @@ export default function TarotApp({
           >
             <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.6L6 20V5a1 1 0 0 1 1-1z" />
           </svg>
-          <span>Journal</span>
-        </button>
-        <button
-          className={profileOpen || authOpen ? "active" : ""}
-          onClick={() => {
-            if (user) {
-              setProfileOpen((open) => !open);
-            } else {
-              openLogin("mobile_account");
-            }
-          }}
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="8" r="3.4" />
-            <path d="M5.5 20a6.8 6.8 0 0 1 13 0" />
-          </svg>
-          <span>Account</span>
-        </button>
-      </nav>
+	          <span>Readings</span>
+	        </button>
+	      </nav>
 
       {authOpen && (
         <div className="modal-backdrop">
