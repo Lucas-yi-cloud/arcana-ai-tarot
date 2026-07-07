@@ -712,7 +712,7 @@ function PersonalizationCard({
             className="field"
             value={readerName}
             onChange={(event) => onReaderNameChange(event.target.value)}
-            placeholder="e.g. Maya"
+            placeholder="e.g. Ava"
             maxLength={40}
           />
         </label>
@@ -747,6 +747,21 @@ function PersonalizationCard({
         </label>
       </div>
     </section>
+  );
+}
+
+function QuestionMoonIcon() {
+  return (
+    <div className="question-icon" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <path
+          d="M24 17.5A9 9 0 1 1 14.5 8a7 7 0 0 0 9.5 9.5Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        />
+        <circle cx="22" cy="9" r="1.1" fill="currentColor" />
+      </svg>
+    </div>
   );
 }
 
@@ -2632,37 +2647,23 @@ export default function TarotApp({
       )}
 
       {route === "question" && (
-        <main className="page">
-          <section className="reading-panel">
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: "50%",
-                background: "#1f1736",
-                color: "var(--gold)",
-                display: "grid",
-                placeItems: "center",
-                marginBottom: 18,
-                fontSize: 28,
-              }}
-            >
-              ◐
-            </div>
-            <h1 className="serif" style={{ margin: 0, fontSize: 42, fontWeight: 500 }}>
+        <main className="question-page">
+          <section className="question-shell">
+            <QuestionMoonIcon />
+            <h1 className="serif question-title">
               What&apos;s on your mind?
             </h1>
-            <p className="message" style={{ marginBottom: 18 }}>
-              Your account keeps readings private, tracks free uses, and protects subscription
-              access on the server.
+            <p className="question-subtitle">
+              Hold your question as you read. The clearer your intention, the clearer the cards.
+              You can also leave it open.
             </p>
             <textarea
-              className="textarea"
+              className="textarea question-textarea"
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask about love, work, timing, or the pattern you keep circling..."
+              placeholder="Type your question for the cards…"
             />
-            <div className="prompt-row" style={{ marginTop: 14 }}>
+            <div className="prompt-row question-prompts">
               {questionPrompts.map((prompt) => (
                 <button className="prompt-chip" key={prompt} onClick={() => setQuestion(prompt)}>
                   {prompt}
@@ -2679,11 +2680,23 @@ export default function TarotApp({
               onBirthDayChange={setBirthDay}
               onBirthYearChange={updateBirthYear}
             />
-            <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
-              <button className="primary-btn" onClick={() => void beginDraw()}>
-                Shuffle & draw
+            <div className="question-actions">
+              <button className="primary-btn question-submit" onClick={() => void beginDraw()}>
+                <span>Shuffle & draw</span>
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
               </button>
-              <button className="secondary-btn" onClick={() => setRoute("detail")}>
+              <button className="question-cancel" onClick={() => setRoute("detail")}>
                 Cancel
               </button>
             </div>
