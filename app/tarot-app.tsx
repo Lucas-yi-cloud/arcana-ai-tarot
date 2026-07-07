@@ -1904,6 +1904,15 @@ export default function TarotApp({
     setPaywallSrc(src);
     setCheckoutMessage("");
     setCheckoutBusy(false);
+    if (!user) {
+      window.sessionStorage.setItem(
+        pendingSubscribeKey,
+        JSON.stringify({ plan: selectedPlan, paywallSrc: src, pendingDraw, spreadId, question })
+      );
+      setShowPaywall(false);
+      openLogin(`paywall_${src}`);
+      return;
+    }
     setShowPaywall(true);
     track("paywall_view", { paywall_src: src });
   }
@@ -1914,6 +1923,7 @@ export default function TarotApp({
     setPendingDraw(false);
     setCheckoutMessage("");
     setCheckoutBusy(false);
+    window.sessionStorage.removeItem(checkoutResumeKey);
   }
 
   async function refreshMe() {
@@ -2012,6 +2022,11 @@ export default function TarotApp({
           flash("Signed in. Please save the reading again.");
         }
       }, 0);
+    }
+
+    if (window.sessionStorage.getItem(pendingSubscribeKey)) {
+      window.sessionStorage.removeItem(googleResumeKey);
+      return;
     }
 
     const rawResume = window.sessionStorage.getItem(googleResumeKey);
@@ -2188,7 +2203,7 @@ export default function TarotApp({
   }, []);
 
   useEffect(() => {
-    if (!user || !stripeConfig?.enabled) return;
+    if (!user || stripeConfig === null) return;
     const raw = window.sessionStorage.getItem(pendingSubscribeKey);
     if (!raw) return;
     window.sessionStorage.removeItem(pendingSubscribeKey);
@@ -2203,29 +2218,36 @@ export default function TarotApp({
       };
       const plan = isPlan(pending.plan) ? pending.plan : selectedPlan;
       const source = isPaywallSource(pending.paywallSrc) ? pending.paywallSrc : paywallSrc;
-      if (pending.pendingDraw) {
+      const shouldResumeDraw = Boolean(pending.pendingDraw);
+      const resumeSpreadId = typeof pending.spreadId === "string" ? pending.spreadId : spreadId;
+      const resumeQuestion = typeof pending.question === "string" ? pending.question : question;
+      if (shouldResumeDraw) {
         window.sessionStorage.setItem(
           checkoutResumeKey,
           JSON.stringify({
             pendingDraw: true,
-            spreadId: typeof pending.spreadId === "string" ? pending.spreadId : spreadId,
-            question: typeof pending.question === "string" ? pending.question : question,
+            spreadId: resumeSpreadId,
+            question: resumeQuestion,
           })
         );
       }
       window.setTimeout(() => {
+        if (resumeSpreadId) setSpreadId(resumeSpreadId);
+        if (typeof resumeQuestion === "string") setQuestion(resumeQuestion);
+        setPendingDraw(shouldResumeDraw);
         setSelectedPlan(plan);
         setPaywallSrc(source);
+        setCheckoutBusy(false);
+        setCheckoutMessage("");
         setShowPaywall(true);
-        setCheckoutMessage("Continuing to secure checkout...");
-        window.setTimeout(() => void startCheckout(plan, { resumed: true, source }), 180);
+        track("paywall_view", { paywall_src: source, after_login: true });
       }, 0);
     } catch {
       window.sessionStorage.removeItem(pendingSubscribeKey);
     }
     // This resumes a subscription intent after Google or email login.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, stripeConfig?.enabled]);
+  }, [user, stripeConfig]);
 
   async function startCheckout(
     plan: Plan,
@@ -2246,7 +2268,9 @@ export default function TarotApp({
         pendingSubscribeKey,
         JSON.stringify({ plan, paywallSrc: source, pendingDraw, spreadId, question })
       );
-      setCheckoutMessage("Sign in first, then we will continue to secure checkout.");
+      setShowPaywall(false);
+      setCheckoutMessage("");
+      setCheckoutBusy(false);
       openLogin("checkout");
       return;
     }
@@ -2448,10 +2472,11 @@ export default function TarotApp({
 
   function startGoogleLogin() {
     setAuthMessage("Opening Google sign-in...");
+    const hasPendingSubscribe = Boolean(window.sessionStorage.getItem(pendingSubscribeKey));
     if (pendingSave) {
       queuePendingSave();
     }
-    if (pendingDraw || route === "question") {
+    if ((pendingDraw || route === "question") && !hasPendingSubscribe) {
       window.sessionStorage.setItem(
         googleResumeKey,
         JSON.stringify({
@@ -2504,12 +2529,13 @@ export default function TarotApp({
     setAuthCode("");
     track("login_success", { method: "email" });
     flash("Signed in securely.");
+    const hasPendingSubscribe = Boolean(window.sessionStorage.getItem(pendingSubscribeKey));
     if (pendingSave) {
       setPendingSave(false);
       window.sessionStorage.removeItem(pendingSaveKey);
       window.sessionStorage.removeItem(pendingSavePayloadKey);
       window.setTimeout(() => void persistReading(latestSavePayloadRef.current ?? currentSavePayload()), 250);
-    } else if (pendingDraw) {
+    } else if (pendingDraw && !hasPendingSubscribe) {
       setPendingDraw(false);
       window.setTimeout(() => void beginDraw(), 200);
     }
@@ -3329,6 +3355,7 @@ export default function TarotApp({
                 setPendingDraw(false);
                 setPendingSave(false);
                 window.sessionStorage.removeItem(pendingSubscribeKey);
+                window.sessionStorage.removeItem(checkoutResumeKey);
                 clearCheckoutIntent();
               }}
             >
