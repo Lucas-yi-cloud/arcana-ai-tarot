@@ -21,6 +21,32 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
 const FALLBACK_MODEL = "deterministic";
+const CARD_LABELS = [
+  "The Fool",
+  "The Magician",
+  "The High Priestess",
+  "The Empress",
+  "The Emperor",
+  "The Hierophant",
+  "The Lovers",
+  "The Chariot",
+  "Strength",
+  "The Hermit",
+  "Wheel of Fortune",
+  "The Wheel of Fortune",
+  "Justice",
+  "The Hanged Man",
+  "Death",
+  "Temperance",
+  "The Devil",
+  "The Tower",
+  "The Star",
+  "The Moon",
+  "The Sun",
+  "Judgement",
+  "Judgment",
+  "The World",
+] as const;
 
 export type DrawInput = {
   num: string;
@@ -67,8 +93,11 @@ const SYSTEM_PROMPT = [
   "For yes/no readings, give a clear but non-absolute verdict: yes, no, likely, not yet, or unclear — plus the condition that changes or supports that answer.",
   "Each card interpretation must be 2 short paragraphs separated by a blank line. The first paragraph should explain the card through its position; the second should connect that position directly to the seeker's question with one reflective cue.",
   "The final synthesis is not a card-by-card explanation. It must function as a concise answer card: a clear takeaway, a direct answer to the question, and one practical next step.",
-  "The final synthesis must be exactly 3 short paragraphs separated by blank lines. Paragraph 1 must be a single highlighted takeaway line in the form **KEY TAKEAWAY: <8-16 words>**. Paragraph 2 must directly answer the exact question in 1-2 sentences. Paragraph 3 must give practical, grounded advice in 1-2 sentences.",
-  "The final synthesis must stay between 85 and 130 words total. Do not explain individual card meanings there; that belongs only in the card interpretations.",
+  "The final synthesis must be exactly 3 short paragraphs separated by blank lines. Paragraph 1 must be a single highlighted takeaway line in the form KEY TAKEAWAY: <8-16 words>. Paragraph 2 must directly answer the exact question in 1-2 sentences. Paragraph 3 must give practical, grounded advice in 1-2 sentences.",
+  "The final synthesis must stay between 75 and 115 words total. Do not explain individual card meanings there; that belongs only in the card interpretations.",
+  "In the final synthesis, do not name tarot cards, do not put card names in parentheses, and do not write evidence lists such as '(The Devil)' or '(The Sun reversed)'.",
+  "In the final synthesis, avoid spiritual filler and vague comfort phrases such as 'inner voice', 'deepest calling', 'honor your worth', 'trust the universe', 'quiet contemplation', or 'align with your purpose' unless the seeker explicitly asked a spiritual question.",
+  "In the final synthesis, be precise: name the likely answer, the main tradeoff or risk, and one next action the seeker can actually take.",
   "Inside JSON string values, represent paragraph breaks as escaped newlines: \\n\\n. Never compress the reading into one long paragraph.",
   "Respond with a single minified JSON object only — no code fences, no commentary outside the JSON.",
 ].join(" ");
@@ -135,12 +164,12 @@ function questionBindingProtocol(spread: Spread, trimmedQuestion: string) {
   const yesNoRule =
     spread.id === "yesno"
       ? [
-          "- Because this is a Yes / No spread, the synthesis takeaway must begin with a verdict for the exact question: '**KEY TAKEAWAY: [Yes/No/Likely/Not yet/Unclear] — [condition].**'",
+          "- Because this is a Yes / No spread, the synthesis takeaway must begin with a verdict for the exact question: 'KEY TAKEAWAY: [Yes/No/Likely/Not yet/Unclear] — [condition].'",
           "- Keep the condition plain and practical. Do not turn the answer into a broad horoscope or a card-meaning lesson.",
         ]
       : [
           "- The synthesis takeaway must answer the exact question in plain language before widening into nuance.",
-          "- In the synthesis, mention card names only when they sharpen the answer. Do not cite cards just to prove the reading.",
+          "- In the synthesis, do not mention card names at all. Convert the spread into a direct conclusion about the question.",
         ];
 
   return [
@@ -205,10 +234,12 @@ function buildUserPrompt(
     "Answer quality checklist:",
     "- The card interpretations may explain card meanings through positions; the synthesis must not repeat those meanings.",
     "- The synthesis must answer the seeker's actual question first, then name what remains conditional and what the seeker can do next.",
-    "- The synthesis should feel like a decision note or reflection note, not a horoscope, essay, or recap.",
+    "- The synthesis should feel like a decision note or reflection note, not a horoscope, essay, card recap, or inspirational quote.",
+    "- The synthesis must not include parenthetical tarot labels, card-name citations, or comma-heavy abstract lists.",
+    "- Prefer concrete words tied to the question: timing, cost, effort, boundary, evidence, conversation, risk, offer, pattern, deadline, or next test.",
     "- Avoid absolute promises, fatalistic predictions, and unsupported certainty.",
     "",
-    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"**KEY TAKEAWAY: <short answer>**\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"}.',
+    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"KEY TAKEAWAY: <short answer>\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"}.',
     "There must be exactly one cards entry per drawn card, in the same order.",
     "Every interpretation and synthesis string must contain visible paragraph breaks using \\n\\n.",
   ].join("\n");
@@ -249,6 +280,29 @@ function ensureParagraphs(text: string, preferredParagraphs: number) {
   return paragraphs.join("\n\n");
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const parentheticalCardLabelPattern = new RegExp(
+  `\\s*\\((?:${CARD_LABELS.map(escapeRegExp).join("|")})(?:\\s+(?:upright|reversed))?\\.?\\)`,
+  "gi"
+);
+
+function cleanSynthesisText(text: string) {
+  return normalizeParagraphBreaks(text)
+    .replace(/\*\*(\s*KEY TAKEAWAY:[^*\n]+?)\*\*/gi, "$1")
+    .replace(/^\*\*(.+?)\*\*$/gm, "$1")
+    .replace(/\*\*/g, "")
+    .replace(parentheticalCardLabelPattern, "")
+    .replace(/[ \t]+([,.;:!?])/g, "$1")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Deterministic Rider-Waite reading used when the LLM is unavailable. */
 export function deterministicInterpretation(
   spread: Spread,
@@ -276,9 +330,6 @@ export function deterministicInterpretation(
   });
 
   const first = cards[0];
-  const last = cards[cards.length - 1];
-  const firstWord = keywords(first)[0];
-  const lastWord = keywords(last)[0];
   const opener = trimmedQuestion
     ? name
       ? `${name}, on "${trimmedQuestion}", the deck answers in layers rather than with a guarantee.`
@@ -290,17 +341,17 @@ export function deterministicInterpretation(
     const positive = !first.reversed && ["sun", "star", "wheel", "heart"].includes(first.glyph);
     const verdict = positive ? "Likely" : "Not yet";
     synthesis =
-      `**KEY TAKEAWAY: ${verdict} — clarify the condition before treating this as settled.**\n\n` +
-      `${opener} The clearest answer is ${positive ? "yes, with active participation" : "not yet, unless something important shifts"}. Hold the decision close to the actual concern inside the question, not to the hope for certainty.\n\n` +
-      `Make one practical test before you act: name what would make this feel steady, fair, and manageable, then look for that evidence in real life.`;
+      `KEY TAKEAWAY: ${verdict} — verify the condition before you commit.\n\n` +
+      `${opener} The clearest answer is ${positive ? "yes, if the practical support is already visible" : "not yet, because the missing condition still matters"}. Treat this as a decision that needs evidence, not reassurance.\n\n` +
+      `Before you act, name the one fact that would change your answer. If you cannot confirm it, pause or choose the lower-risk step.`;
   } else {
     synthesis =
-      `**KEY TAKEAWAY: Move from ${firstWord} toward ${lastWord} with one deliberate next step.**\n\n` +
-      `${opener} The answer is not asking you to force a final outcome today; it is pointing to the part of ${focus} that is ready for a clearer choice.\n\n` +
-      "Before acting, separate what you know from what you are assuming. Then choose the next step that gives you more real information, steadier boundaries, or a cleaner conversation.";
+      `KEY TAKEAWAY: Make the next move only after the facts are clearer.\n\n` +
+      `${opener} The useful answer is practical: do not decide from pressure alone. The spread points to a choice that needs cleaner information, firmer boundaries, or a more direct conversation before it becomes reliable.\n\n` +
+      "Write down the main risk, the evidence you still need, and the smallest step that tests the situation. Act on that test before making a bigger commitment.";
   }
 
-  return { cards: cardOut, synthesis, model: FALLBACK_MODEL };
+  return { cards: cardOut, synthesis: cleanSynthesisText(synthesis), model: FALLBACK_MODEL };
 }
 
 type AnthropicResponse = {
@@ -456,7 +507,7 @@ export async function interpretReading(
       userPrompt,
       "",
       "The previous response was missing or not valid JSON. Return the same reading again as a single valid JSON object only — no code fences, no commentary outside the JSON —",
-      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"**KEY TAKEAWAY: <short answer>**\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"} with exactly ${cards.length} card entries in position order.`,
+      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"KEY TAKEAWAY: <short answer>\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"} with exactly ${cards.length} card entries in position order.`,
       "Every interpretation and synthesis string must contain paragraph breaks using \\n\\n.",
     ].join("\n");
     const retry = await call(repairPrompt);
@@ -488,7 +539,7 @@ export async function interpretReading(
 
   return {
     cards: cardOut,
-    synthesis: ensureParagraphs(parsed.synthesis ?? "", 3),
+    synthesis: ensureParagraphs(cleanSynthesisText(parsed.synthesis ?? ""), 3),
     model: result.model,
   };
 }

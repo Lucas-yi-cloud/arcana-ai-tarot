@@ -607,7 +607,20 @@ function splitReadingParagraphs(text: string) {
 }
 
 function renderReadingInline(text: string): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+  const normalized = text
+    .replace(/^\*\*(.+?)\*\*$/u, "$1")
+    .replace(/\*\*/g, "")
+    .trim();
+  const takeaway = normalized.match(/^KEY TAKEAWAY:\s*(.+)$/iu);
+  if (takeaway) {
+    return [
+      <strong className="reading-highlight" key="key-takeaway">
+        {`KEY TAKEAWAY: ${takeaway[1].trim()}`}
+      </strong>,
+    ];
+  }
+
+  const parts = normalized.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
