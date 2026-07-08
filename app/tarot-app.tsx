@@ -1,8 +1,8 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
 import { spreadDescription, spreadTitle } from "@/lib/structured-data";
 import { siteBaseUrl, siteDescription, siteTitle, spreadSeoMeta } from "@/lib/tarot-seo";
@@ -377,6 +377,22 @@ function routePath(route: Route, spread: Spread) {
 function absoluteRouteUrl(route: Route, spread: Spread) {
   const path = routePath(route, spread);
   return path === "/" ? siteBaseUrl : `${siteBaseUrl}${path}`;
+}
+
+function handleClientLink(event: ReactMouseEvent<HTMLAnchorElement>, action: () => void) {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  action();
 }
 
 function documentTitleForRoute(route: Route, spread: Spread) {
@@ -970,7 +986,10 @@ function RelatedSpreads({
     <nav className="related-spreads" aria-label="Other tarot spreads">
       <div className="related-spreads-head">
         <h2>Explore other spreads</h2>
-        <button type="button" onClick={onGoHome}>
+        <a
+          href="/#spreads"
+          onClick={(event) => handleClientLink(event, onGoHome)}
+        >
           All {spreads.length} spreads
           <svg
             viewBox="0 0 24 24"
@@ -984,11 +1003,15 @@ function RelatedSpreads({
           >
             <path d="M9 6l6 6-6 6" />
           </svg>
-        </button>
+        </a>
       </div>
       <div className="related-spread-grid">
         {related.map((item) => (
-          <button type="button" key={item.id} onClick={() => onOpenSpread(item.id)}>
+          <a
+            href={`/spread/${item.id}`}
+            key={item.id}
+            onClick={(event) => handleClientLink(event, () => onOpenSpread(item.id))}
+          >
             <div>
               <strong>{item.name}</strong>
               <span>
@@ -996,7 +1019,7 @@ function RelatedSpreads({
               </span>
             </div>
             <p>{item.blurb}</p>
-          </button>
+          </a>
         ))}
       </div>
     </nav>
@@ -1479,17 +1502,26 @@ function SiteFooter({
             AI-guided tarot readings drawn from the classic Rider-Waite deck. Ask a
             question, draw your cards, and hear what you already know.
           </p>
-          <button className="white-btn" style={{ padding: "10px 18px", fontSize: 13.5 }} onClick={onGoHome}>
+          <a
+            className="white-btn"
+            href="/#spreads"
+            style={{ padding: "10px 18px", fontSize: 13.5 }}
+            onClick={(event) => handleClientLink(event, onGoHome)}
+          >
             Begin a reading →
-          </button>
+          </a>
         </div>
         <div>
           <div className="footer-title">READINGS</div>
           <div className="footer-links">
             {readingLinks.map(([id, label]) => (
-              <button key={id} onClick={() => onOpenSpread(id)}>
+              <a
+                href={`/spread/${id}`}
+                key={id}
+                onClick={(event) => handleClientLink(event, () => onOpenSpread(id))}
+              >
                 {label}
-              </button>
+              </a>
             ))}
           </div>
         </div>
@@ -1497,9 +1529,13 @@ function SiteFooter({
           <div className="footer-title">MORE SPREADS</div>
           <div className="footer-links">
             {moreLinks.map(([id, label]) => (
-              <button key={id} onClick={() => onOpenSpread(id)}>
+              <a
+                href={`/spread/${id}`}
+                key={id}
+                onClick={(event) => handleClientLink(event, () => onOpenSpread(id))}
+              >
                 {label}
-              </button>
+              </a>
             ))}
           </div>
         </div>
@@ -1507,9 +1543,15 @@ function SiteFooter({
           <div className="footer-title">ARCANA</div>
           <div className="footer-links">
             <button onClick={onOpenPaywall}>Arcana Pro</button>
-            <button onClick={() => onRoute("about")}>About</button>
-            <button onClick={() => onRoute("privacy")}>Privacy</button>
-            <button onClick={() => onRoute("contact")}>Contact</button>
+            <a href="/about" onClick={(event) => handleClientLink(event, () => onRoute("about"))}>
+              About
+            </a>
+            <a href="/privacy" onClick={(event) => handleClientLink(event, () => onRoute("privacy"))}>
+              Privacy
+            </a>
+            <a href="/contact" onClick={(event) => handleClientLink(event, () => onRoute("contact"))}>
+              Contact
+            </a>
           </div>
         </div>
       </div>
@@ -1519,9 +1561,15 @@ function SiteFooter({
           your own choices.
         </span>
         <nav aria-label="Footer">
-          <button onClick={() => onRoute("about")}>About</button>
-          <button onClick={() => onRoute("privacy")}>Privacy</button>
-          <button onClick={() => onRoute("contact")}>Contact</button>
+          <a href="/about" onClick={(event) => handleClientLink(event, () => onRoute("about"))}>
+            About
+          </a>
+          <a href="/privacy" onClick={(event) => handleClientLink(event, () => onRoute("privacy"))}>
+            Privacy
+          </a>
+          <a href="/contact" onClick={(event) => handleClientLink(event, () => onRoute("contact"))}>
+            Contact
+          </a>
           <span>18+</span>
         </nav>
       </div>
@@ -2611,26 +2659,33 @@ export default function TarotApp({
   return (
     <div className="app-shell">
       <nav className="top-nav">
-        <button className="brand" onClick={goHome} aria-label="Arcana AI home">
+        <a
+          className="brand"
+          href="/"
+          aria-label="Arcana AI home"
+          onClick={(event) => handleClientLink(event, goHome)}
+        >
           <span className="brand-mark">
             <LogoMark />
           </span>
           <span>Arcana</span>
           <span className="brand-ai serif">AI</span>
-        </button>
+        </a>
         <div className="nav-links">
-          <button
+          <a
             className={`nav-pill ${route !== "history" ? "active" : ""}`}
-            onClick={goHome}
+            href="/#spreads"
+            onClick={(event) => handleClientLink(event, beginAtSpreads)}
           >
             Spreads
-          </button>
-	          <button
+          </a>
+	          <a
 	            className={`nav-pill ${route === "history" ? "active" : ""}`}
-	            onClick={() => goRoute("history")}
+	            href="/journals"
+	            onClick={(event) => handleClientLink(event, () => goRoute("history"))}
 	          >
 	            Readings
-	          </button>
+	          </a>
         </div>
         <div className="account-actions">
           {user?.subscribed ? (
@@ -2802,7 +2857,12 @@ export default function TarotApp({
           </div>
           <div className="spread-grid">
             {spreads.map((item) => (
-              <button className="spread-card" key={item.id} onClick={() => openSpread(item.id)}>
+              <a
+                className="spread-card"
+                href={`/spread/${item.id}`}
+                key={item.id}
+                onClick={(event) => handleClientLink(event, () => openSpread(item.id))}
+              >
                 <div className="spread-preview starfield">
                   <span className="preview-label">
                     {item.count} {item.count === 1 ? "card" : "cards"}
@@ -2832,7 +2892,7 @@ export default function TarotApp({
                     <span>Read ›</span>
                   </div>
                 </div>
-              </button>
+              </a>
             ))}
           </div>
           <SeoSection openFaq={openFaq} onToggleFaq={(index) => setOpenFaq((current) => (current === index ? -1 : index))} />
@@ -2847,9 +2907,13 @@ export default function TarotApp({
 
 	      {route === "detail" && (
 	        <main className="page detail-page">
-	          <button className="detail-back-link" onClick={beginAtSpreads}>
+	          <a
+	            className="detail-back-link"
+	            href="/#spreads"
+	            onClick={(event) => handleClientLink(event, beginAtSpreads)}
+	          >
 	            ‹ All spreads
-	          </button>
+	          </a>
 	          <header className="detail-header">
 	            <h1 className="serif detail-title">{spread.name}</h1>
 	            <div className="detail-meta">
@@ -3030,9 +3094,13 @@ export default function TarotApp({
       {route === "result" && (
         <main className="page result-page">
           <section className="result-heading">
-            <button className="result-back" onClick={goHome}>
+            <a
+              className="result-back"
+              href="/#spreads"
+              onClick={(event) => handleClientLink(event, beginAtSpreads)}
+            >
               ‹ <span>Spreads</span>
-            </button>
+            </a>
             <p>{spread.name}</p>
             <h1 className="serif">
               {question.trim() ? `“${question.trim()}”` : "General reading"}
@@ -3274,9 +3342,13 @@ export default function TarotApp({
                 No saved readings yet
               </h2>
               <p className="message">Browse spreads and save a result to see it here.</p>
-              <button className="primary-btn" onClick={goHome}>
+              <a
+                className="primary-btn"
+                href="/#spreads"
+                onClick={(event) => handleClientLink(event, beginAtSpreads)}
+              >
                 Browse spreads
-              </button>
+              </a>
             </section>
           )}
           {user && history.length > 0 && (
@@ -3307,7 +3379,11 @@ export default function TarotApp({
       {route === "contact" && <ContactPage onBack={goHome} />}
 
 	      <nav className="mobile-tabbar" aria-label="Mobile navigation">
-	        <button className={route !== "history" ? "active" : ""} onClick={goHome}>
+	        <a
+	          className={route !== "history" ? "active" : ""}
+	          href="/"
+	          onClick={(event) => handleClientLink(event, goHome)}
+	        >
           <svg
             width="22"
             height="22"
@@ -3323,10 +3399,14 @@ export default function TarotApp({
             <rect x="14" y="4" width="6" height="6" rx="1.2" />
             <rect x="4" y="14" width="6" height="6" rx="1.2" />
             <rect x="14" y="14" width="6" height="6" rx="1.2" />
-          </svg>
+	          </svg>
 	          <span>Home</span>
-	        </button>
-	        <button className={route === "history" ? "active" : ""} onClick={() => goRoute("history")}>
+	        </a>
+	        <a
+	          className={route === "history" ? "active" : ""}
+	          href="/journals"
+	          onClick={(event) => handleClientLink(event, () => goRoute("history"))}
+	        >
           <svg
             width="22"
             height="22"
@@ -3339,9 +3419,9 @@ export default function TarotApp({
             aria-hidden="true"
           >
             <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.6L6 20V5a1 1 0 0 1 1-1z" />
-          </svg>
+	          </svg>
 	          <span>Readings</span>
-	        </button>
+	        </a>
 	      </nav>
 
       {authOpen && (

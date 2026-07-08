@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
+import { siteBaseUrl, siteDescription, siteTitle } from "@/lib/tarot-seo";
 import "./globals.css";
 
-const siteTitle = "AI Tarot Reading — Free Online Tarot Card Readings | Arcana AI";
-const siteDescription =
-  "Get an AI tarot reading online in seconds. Ask a question, draw the cards, and let Arcana AI interpret the Rider-Waite deck — from a daily one-card draw to the full Celtic Cross. Free, private, and accurate.";
-const siteUrl = "https://mystic-ai.top";
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(siteBaseUrl),
   title: siteTitle,
   description: siteDescription,
   keywords: [
@@ -31,18 +28,18 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    title: "AI Tarot Reading — Free Online Tarot Card Readings",
+    title: siteTitle,
     description:
-      "Ask a question, draw the cards, and let Arcana AI read the Rider-Waite spread for you. Free online AI tarot reading.",
+      "Ask a question, draw Rider-Waite cards, and get a clear AI tarot reading online.",
     url: "/",
     siteName: "Arcana AI Tarot",
     images: ["/og-image.jpg"],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AI Tarot Reading — Free Online Tarot Card Readings",
+    title: siteTitle,
     description:
-      "Ask a question, draw the cards, and let Arcana AI read the Rider-Waite spread for you. Free online AI tarot reading.",
+      "Ask a question, draw Rider-Waite cards, and get a clear AI tarot reading online.",
     images: ["/og-image.jpg"],
   },
   icons: {

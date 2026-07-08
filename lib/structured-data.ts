@@ -107,6 +107,56 @@ export function homeStructuredData() {
   ]);
 }
 
+export function staticPageStructuredData({
+  path,
+  title,
+  description,
+  breadcrumbName,
+}: {
+  path: string;
+  title: string;
+  description: string;
+  breadcrumbName: string;
+}) {
+  const url = absoluteUrl(path);
+  const webpageId = `${url}#webpage`;
+  const breadcrumbId = `${url}#breadcrumb`;
+
+  return graph([
+    organizationSchema(),
+    websiteSchema(),
+    {
+      "@type": "BreadcrumbList",
+      "@id": breadcrumbId,
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: `${siteBaseUrl}/`,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: breadcrumbName,
+          item: url,
+        },
+      ],
+    },
+    {
+      "@type": "WebPage",
+      "@id": webpageId,
+      url,
+      name: title,
+      description,
+      inLanguage: "en",
+      isPartOf: { "@id": websiteId },
+      breadcrumb: { "@id": breadcrumbId },
+      publisher: { "@id": organizationId },
+    },
+  ]);
+}
+
 export function spreadDescription(spread: Spread) {
   const seo = spreadSeoMeta[spread.id];
   return clampSeoDescription(
@@ -117,7 +167,7 @@ export function spreadDescription(spread: Spread) {
 }
 
 export function spreadTitle(spread: Spread) {
-  return `${spread.name} Tarot Reading — Free AI ${spread.name} Spread | Arcana AI`;
+  return `${spread.name} Tarot Reading | Arcana AI`;
 }
 
 export function spreadStructuredData(spread: Spread) {

@@ -225,10 +225,12 @@ button {
   gap: 10px;
   border: 0;
   background: transparent;
+  color: var(--ink);
   cursor: pointer;
   padding: 0;
   font-weight: 650;
   letter-spacing: -0.02em;
+  text-decoration: none;
 }
 
 .brand-mark {
@@ -266,8 +268,10 @@ button {
 .nav-pill {
   padding: 8px 14px;
   background: transparent;
+  color: var(--ink);
   font-size: 14px;
   font-weight: 500;
+  text-decoration: none;
 }
 
 .nav-pill.active {
@@ -614,6 +618,7 @@ button {
   border-radius: 999px;
   cursor: pointer;
   font-weight: 650;
+  text-decoration: none;
 }
 
 .white-btn {
@@ -729,12 +734,15 @@ button {
 }
 
 .spread-card {
+  display: block;
   overflow: hidden;
   border: 1px solid rgba(29, 28, 31, 0.08);
   border-radius: 18px;
   background: #fff;
+  color: inherit;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
@@ -970,6 +978,7 @@ button {
   font-size: 14px;
   font-weight: 650;
   padding: 0;
+  text-decoration: none;
 }
 
 .detail-back-link:hover {
@@ -1304,7 +1313,7 @@ button {
   letter-spacing: 0;
 }
 
-.related-spreads-head button {
+.related-spreads-head a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1314,6 +1323,7 @@ button {
   cursor: pointer;
   font-weight: 750;
   padding: 0;
+  text-decoration: none;
 }
 
 .related-spread-grid {
@@ -1322,7 +1332,7 @@ button {
   gap: 14px;
 }
 
-.related-spread-grid button {
+.related-spread-grid a {
   min-height: 128px;
   border: 1px solid rgba(29, 28, 31, 0.08);
   border-radius: 16px;
@@ -1332,9 +1342,10 @@ button {
   cursor: pointer;
   padding: 18px;
   text-align: left;
+  text-decoration: none;
 }
 
-.related-spread-grid button:hover {
+.related-spread-grid a:hover {
   border-color: rgba(100, 66, 192, 0.24);
   box-shadow: 0 14px 30px rgba(31, 23, 54, 0.1);
 }
@@ -1901,6 +1912,7 @@ button {
   cursor: pointer;
   padding: 0;
   font-size: 14px;
+  text-decoration: none;
 }
 
 .result-back:hover {
@@ -3294,17 +3306,22 @@ button {
 }
 
 .footer-links button,
-.footer-bottom button {
+.footer-links a,
+.footer-bottom button,
+.footer-bottom a {
   border: 0;
   background: transparent;
   color: rgba(255, 255, 255, 0.78);
   cursor: pointer;
   padding: 0;
   text-align: left;
+  text-decoration: none;
 }
 
 .footer-links button:hover,
-.footer-bottom button:hover {
+.footer-links a:hover,
+.footer-bottom button:hover,
+.footer-bottom a:hover {
   color: #fff;
 }
 
@@ -3328,7 +3345,8 @@ button {
   gap: 14px;
 }
 
-.footer-bottom button {
+.footer-bottom button,
+.footer-bottom a {
   color: rgba(255, 255, 255, 0.5);
   font-size: 12.5px;
 }
@@ -3801,7 +3819,7 @@ button {
     backdrop-filter: blur(16px);
   }
 
-  .mobile-tabbar button {
+  .mobile-tabbar a {
     display: grid;
     gap: 3px;
     place-items: center;
@@ -3811,9 +3829,10 @@ button {
     cursor: pointer;
     font-size: 11px;
     font-weight: 650;
+    text-decoration: none;
   }
 
-  .mobile-tabbar button.active {
+  .mobile-tabbar a.active {
     color: var(--purple);
   }
 

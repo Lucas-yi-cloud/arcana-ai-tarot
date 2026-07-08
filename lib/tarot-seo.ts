@@ -19,9 +19,9 @@ export type SpreadSeoMeta = {
 };
 
 export const siteBaseUrl = "https://mystic-ai.top";
-export const siteTitle = "AI Tarot Reading — Free Online Tarot Card Readings | Arcana AI";
+export const siteTitle = "AI Tarot Reading Online | Arcana AI Tarot";
 export const siteDescription =
-  "Get an AI tarot reading online in seconds. Ask a question, draw the cards, and let Arcana AI interpret the Rider-Waite deck — from a daily one-card draw to the full Celtic Cross. Free, private, and accurate.";
+  "Ask a question, draw Rider-Waite tarot cards, and get a clear AI tarot reading online. Free to start, private, and built for real spreads.";
 export const siteImage = `${siteBaseUrl}/og-image.jpg`;
 
 export const spreadSeoMeta: Record<string, SpreadSeoMeta> = {
@@ -408,5 +408,9 @@ export const spreadSeoMeta: Record<string, SpreadSeoMeta> = {
 };
 
 export function clampSeoDescription(value: string) {
-  return value.length > 300 ? `${value.slice(0, 297)}...` : value;
+  const maxLength = 155;
+  if (value.length <= maxLength) return value;
+
+  const clipped = value.slice(0, maxLength - 3).replace(/\s+\S*$/, "");
+  return `${clipped}...`;
 }
