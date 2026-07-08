@@ -2,7 +2,14 @@
 
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
 import { spreadDescription, spreadTitle } from "@/lib/structured-data";
 import { siteBaseUrl, siteDescription, siteTitle, spreadSeoMeta } from "@/lib/tarot-seo";
@@ -599,6 +606,21 @@ function splitReadingParagraphs(text: string) {
     .filter(Boolean);
 }
 
+function renderReadingInline(text: string): ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong className="reading-highlight" key={`${part.slice(0, 24)}-${index}`}>
+          {part.slice(2, -2).trim()}
+        </strong>
+      );
+    }
+
+    return <span key={`${part.slice(0, 24)}-${index}`}>{part}</span>;
+  });
+}
+
 function ReadingParagraphs({
   text,
   className,
@@ -610,7 +632,7 @@ function ReadingParagraphs({
   return (
     <div className={className}>
       {paragraphs.map((paragraph, index) => (
-        <p key={`${paragraph.slice(0, 28)}-${index}`}>{paragraph}</p>
+        <p key={`${paragraph.slice(0, 28)}-${index}`}>{renderReadingInline(paragraph)}</p>
       ))}
     </div>
   );

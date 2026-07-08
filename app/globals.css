@@ -2140,12 +2140,31 @@ button {
 .reading-synthesis p {
   margin: 16px 0 0;
   color: #2a1f54;
-  font-size: 24px;
-  line-height: 1.55;
+  font-size: 22px;
+  line-height: 1.48;
 }
 
 .reading-synthesis p + p {
-  margin-top: 18px;
+  margin-top: 14px;
+}
+
+.reading-synthesis .reading-highlight {
+  display: block;
+  color: var(--purple);
+  font-family: var(
+    --font-sans,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Segoe UI",
+    system-ui,
+    sans-serif
+  );
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  text-transform: uppercase;
 }
 
 .followup-card {
@@ -3953,7 +3972,13 @@ button {
   }
 
   .reading-synthesis p {
-    font-size: 21px;
+    font-size: 19px;
+    line-height: 1.48;
+  }
+
+  .reading-synthesis .reading-highlight {
+    font-size: 12px;
+    letter-spacing: 0.08em;
   }
 
   .result-actions {

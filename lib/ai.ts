@@ -66,9 +66,11 @@ const SYSTEM_PROMPT = [
   "Do not give medical, legal, financial, or mental-health directives. For career and money readings give reflective guidance and gentle next steps, not professional advice; for relationship readings describe dynamics and choices, not guaranteed feelings or outcomes.",
   "For yes/no readings, give a clear but non-absolute verdict: yes, no, likely, not yet, or unclear — plus the condition that changes or supports that answer.",
   "Each card interpretation must be 2 short paragraphs separated by a blank line. The first paragraph should explain the card through its position; the second should connect that position directly to the seeker's question with one reflective cue.",
-  "The final synthesis must be 3 short paragraphs separated by blank lines. Paragraph 1 directly answers the exact question with nuance, paragraph 2 explains why the cards point that way, and paragraph 3 offers grounded encouragement or a next step.",
+  "The final synthesis is not a card-by-card explanation. It must function as a concise answer card: a clear takeaway, a direct answer to the question, and one practical next step.",
+  "The final synthesis must be exactly 3 short paragraphs separated by blank lines. Paragraph 1 must be a single highlighted takeaway line in the form **KEY TAKEAWAY: <8-16 words>**. Paragraph 2 must directly answer the exact question in 1-2 sentences. Paragraph 3 must give practical, grounded advice in 1-2 sentences.",
+  "The final synthesis must stay between 85 and 130 words total. Do not explain individual card meanings there; that belongs only in the card interpretations.",
   "Inside JSON string values, represent paragraph breaks as escaped newlines: \\n\\n. Never compress the reading into one long paragraph.",
-  "Respond with a single minified JSON object only — no markdown, no code fences, no commentary.",
+  "Respond with a single minified JSON object only — no code fences, no commentary outside the JSON.",
 ].join(" ");
 
 const RESPONSE_SCHEMA = {
@@ -133,12 +135,12 @@ function questionBindingProtocol(spread: Spread, trimmedQuestion: string) {
   const yesNoRule =
     spread.id === "yesno"
       ? [
-          "- Because this is a Yes / No spread, synthesis paragraph 1 must begin with a verdict for the exact question: 'This leans [yes/no/likely/not yet/unclear] — [condition].'",
-          "- Explain the condition through the card's orientation and traditional theme; do not turn the answer into a broad horoscope.",
+          "- Because this is a Yes / No spread, the synthesis takeaway must begin with a verdict for the exact question: '**KEY TAKEAWAY: [Yes/No/Likely/Not yet/Unclear] — [condition].**'",
+          "- Keep the condition plain and practical. Do not turn the answer into a broad horoscope or a card-meaning lesson.",
         ]
       : [
-          "- Synthesis paragraph 1 must answer the exact question in plain language before widening into nuance.",
-          "- Synthesis paragraph 2 must cite at least two concrete anchors from the spread: card names, positions, orientation, or position descriptions.",
+          "- The synthesis takeaway must answer the exact question in plain language before widening into nuance.",
+          "- In the synthesis, mention card names only when they sharpen the answer. Do not cite cards just to prove the reading.",
         ];
 
   return [
@@ -201,11 +203,12 @@ function buildUserPrompt(
     questionBindingProtocol(spread, trimmed),
     "",
     "Answer quality checklist:",
-    "- The synthesis should not merely summarize card meanings; it must answer the seeker's actual question.",
-    "- The reading should name what the cards make more visible, what remains conditional, and what the seeker can do next.",
+    "- The card interpretations may explain card meanings through positions; the synthesis must not repeat those meanings.",
+    "- The synthesis must answer the seeker's actual question first, then name what remains conditional and what the seeker can do next.",
+    "- The synthesis should feel like a decision note or reflection note, not a horoscope, essay, or recap.",
     "- Avoid absolute promises, fatalistic predictions, and unsupported certainty.",
     "",
-    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"<paragraph 1>\\n\\n<paragraph 2>\\n\\n<paragraph 3>"}.',
+    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"**KEY TAKEAWAY: <short answer>**\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"}.',
     "There must be exactly one cards entry per drawn card, in the same order.",
     "Every interpretation and synthesis string must contain visible paragraph breaks using \\n\\n.",
   ].join("\n");
@@ -285,15 +288,16 @@ export function deterministicInterpretation(
   let synthesis: string;
   if (spread.id === "yesno") {
     const positive = !first.reversed && ["sun", "star", "wheel", "heart"].includes(first.glyph);
+    const verdict = positive ? "Likely" : "Not yet";
     synthesis =
-      `${opener} This leans ${positive ? "yes" : "not yet"} — if you work with the condition the card is showing instead of treating it as fate.\n\n` +
-      `${first.name} points to ${firstWord}, so the answer is shaped by that specific energy in relation to the question. Notice whether the card is describing support that is already present, or a missing piece that needs care first.\n\n` +
-      "Use the reading as a checkpoint: name the real concern inside the question, then choose the next step that makes that concern more manageable.";
+      `**KEY TAKEAWAY: ${verdict} — clarify the condition before treating this as settled.**\n\n` +
+      `${opener} The clearest answer is ${positive ? "yes, with active participation" : "not yet, unless something important shifts"}. Hold the decision close to the actual concern inside the question, not to the hope for certainty.\n\n` +
+      `Make one practical test before you act: name what would make this feel steady, fair, and manageable, then look for that evidence in real life.`;
   } else {
     synthesis =
-      `${opener} The reading begins with ${firstWord} and resolves toward ${lastWord}, which gives the spread a clear emotional movement.\n\n` +
-      `${spread.name} is asking you to notice how the first impulse can mature into the final card's lesson in relation to ${focus}. The cards are less interested in a fixed outcome than in the pattern you can now see.\n\n` +
-      "Take the next step from that pattern: name what is true, separate what is conditional from what is known, and let the reading become something practical rather than something to worry over.";
+      `**KEY TAKEAWAY: Move from ${firstWord} toward ${lastWord} with one deliberate next step.**\n\n` +
+      `${opener} The answer is not asking you to force a final outcome today; it is pointing to the part of ${focus} that is ready for a clearer choice.\n\n` +
+      "Before acting, separate what you know from what you are assuming. Then choose the next step that gives you more real information, steadier boundaries, or a cleaner conversation.";
   }
 
   return { cards: cardOut, synthesis, model: FALLBACK_MODEL };
@@ -451,8 +455,8 @@ export async function interpretReading(
     const repairPrompt = [
       userPrompt,
       "",
-      "The previous response was missing or not valid JSON. Return the same reading again as a single valid JSON object only — no markdown, no code fences, no commentary —",
-      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"<paragraph 1>\\n\\n<paragraph 2>\\n\\n<paragraph 3>"} with exactly ${cards.length} card entries in position order.`,
+      "The previous response was missing or not valid JSON. Return the same reading again as a single valid JSON object only — no code fences, no commentary outside the JSON —",
+      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"**KEY TAKEAWAY: <short answer>**\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"} with exactly ${cards.length} card entries in position order.`,
       "Every interpretation and synthesis string must contain paragraph breaks using \\n\\n.",
     ].join("\n");
     const retry = await call(repairPrompt);
