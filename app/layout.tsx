@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { siteBaseUrl, siteDescription, siteTitle } from "@/lib/tarot-seo";
 import "./globals.css";
 
+const ga4MeasurementId = "G-BV1BZXP1X2";
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteBaseUrl),
   title: siteTitle,
@@ -56,7 +58,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script async src="/ga4-init.js" />
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${ga4MeasurementId}`} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', '${ga4MeasurementId}');
+`,
+          }}
+        />
       </head>
       <body>
         {children}

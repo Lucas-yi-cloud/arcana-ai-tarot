@@ -1,6 +1,6 @@
 # GA4 conversion event map
 
-Measurement ID: `G-DT7RGRTYV4`
+Measurement ID: `G-BV1BZXP1X2`
 
 Arcana AI sends custom funnel events and GA4 recommended ecommerce events from the client. Use this file as the source of truth when configuring GA4 key events and Google Ads conversions.
 
