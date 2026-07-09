@@ -11,6 +11,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { FooterInstagramLink } from "@/app/footer-social-link";
 import { inferSpreadIdForQuestion } from "@/lib/spread-inference";
 import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
 import { spreadDescription, spreadTitle } from "@/lib/structured-data";
@@ -1547,6 +1548,7 @@ function SiteFooter({
           >
             Begin a reading →
           </a>
+          <FooterInstagramLink />
         </div>
         <div>
           <div className="footer-title">READINGS</div>
@@ -2961,7 +2963,7 @@ export default function TarotApp({
           </section>
 
           <div className="section-head" id="spreads">
-            <h2>Choose your spread</h2>
+            <h2>Or Choose your own Spread</h2>
 	            <span>
 	              {user
 	                ? membershipCaption(user, freeLimit)

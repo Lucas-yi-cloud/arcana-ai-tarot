@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 
 import CardBottomTabs from "@/app/card/card-bottom-tabs";
+import { FooterInstagramLink } from "@/app/footer-social-link";
 import SiteHeader from "@/app/site-header";
 import {
   cardIndexFaq,
@@ -49,6 +50,7 @@ function CardFooter() {
           <span className="cm-brand-ai serif">AI</span>
         </a>
         <p>AI-guided tarot readings and Major Arcana meanings drawn from the Rider-Waite-Smith deck.</p>
+        <FooterInstagramLink />
       </div>
       <nav aria-label="Footer card links">
         <a href="/card">All 22 Major Arcana</a>

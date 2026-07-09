@@ -2,6 +2,7 @@
 
 import CardBottomTabs from "@/app/card/card-bottom-tabs";
 import { CardMeaningHero } from "@/app/card/card-meaning-hero";
+import { FooterInstagramLink } from "@/app/footer-social-link";
 import SiteHeader from "@/app/site-header";
 import { spreads } from "@/lib/tarot-data";
 import {
@@ -65,6 +66,7 @@ function CardFooter() {
           <span className="cm-brand-ai serif">AI</span>
         </a>
         <p>AI-guided tarot readings and Major Arcana meanings drawn from the Rider-Waite-Smith deck.</p>
+        <FooterInstagramLink />
       </div>
       <nav aria-label="Footer card links">
         <a href="/card">All 22 Major Arcana</a>

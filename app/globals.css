@@ -3380,6 +3380,38 @@ button {
   line-height: 1.6;
 }
 
+.footer-social-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  margin-top: 18px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+  text-decoration: none;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.footer-social-link:hover {
+  border-color: rgba(255, 233, 138, 0.36);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.footer-social-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .footer-title {
   margin-bottom: 14px;
   color: rgba(255, 255, 255, 0.45);
