@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 
+import CardBottomTabs from "@/app/card/card-bottom-tabs";
 import { CardMeaningHero } from "@/app/card/card-meaning-hero";
+import SiteHeader from "@/app/site-header";
 import { spreads } from "@/lib/tarot-data";
 import {
   cardMeaningPath,
@@ -48,50 +50,6 @@ function CategoryIcon({ type }: { type: "love" | "career" | "money" }) {
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={path} />
     </svg>
-  );
-}
-
-function CardTopNav({ active = "cards" }: { active?: "spreads" | "cards" | "journals" }) {
-  return (
-    <>
-      <nav className="cm-top-nav" aria-label="Card meanings navigation">
-        <a className="cm-brand" href="/" aria-label="Arcana AI home">
-          <span className="cm-brand-mark">
-            <LogoMark />
-          </span>
-          <span>Arcana</span>
-          <span className="cm-brand-ai serif">AI</span>
-        </a>
-        <div className="cm-nav-pills">
-          <a className={active === "spreads" ? "active" : ""} href="/#spreads">
-            Spreads
-          </a>
-          <a className={active === "cards" ? "active" : ""} href="/card" aria-current={active === "cards" ? "page" : undefined}>
-            Cards
-          </a>
-          <a className={active === "journals" ? "active" : ""} href="/journals">
-            Journals
-          </a>
-        </div>
-        <a className="cm-account-pill" href="/journals">
-          Sign in
-        </a>
-      </nav>
-      <nav className="cm-bottom-tabs" aria-label="Mobile card meanings navigation">
-        <a href="/">
-          <span className="cm-tab-icon grid" aria-hidden="true" />
-          <span>Home</span>
-        </a>
-        <a className="active" href="/card" aria-current="page">
-          <span className="cm-tab-icon cards" aria-hidden="true" />
-          <span>Cards</span>
-        </a>
-        <a href="/journals">
-          <span className="cm-tab-icon bookmark" aria-hidden="true" />
-          <span>Readings</span>
-        </a>
-      </nav>
-    </>
   );
 }
 
@@ -147,7 +105,8 @@ export function CardMeaningDetail({ card }: { card: TarotCardMeaning }) {
 
   return (
     <div className="cm-page">
-      <CardTopNav />
+      <SiteHeader active="cards" />
+      <CardBottomTabs />
       <main className="cm-container narrow">
         <nav className="cm-breadcrumb" aria-label="Breadcrumb">
           <a href="/">Home</a>
