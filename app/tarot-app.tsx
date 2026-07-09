@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -909,6 +910,15 @@ function detailDiagramHeight(spread: Spread) {
   return 260;
 }
 
+function detailMobileDiagramHeight(spread: Spread) {
+  if (spread.count >= 10) return 440;
+  if (spread.count >= 7) return 420;
+  if (spread.count >= 5) return 380;
+  if (spread.count >= 3) return 280;
+  if (spread.count === 2) return 260;
+  return 240;
+}
+
 function detailLayoutScale(spread: Spread) {
   if (spread.count === 1) return 1.7;
   if (spread.count >= 10) return 0.56;
@@ -919,6 +929,7 @@ function detailLayoutScale(spread: Spread) {
 
 function SpreadLayoutInfoCard({ spread }: { spread: Spread }) {
   const height = detailDiagramHeight(spread);
+  const mobileHeight = detailMobileDiagramHeight(spread);
   const scale = detailLayoutScale(spread);
 
   return (
@@ -926,7 +937,10 @@ function SpreadLayoutInfoCard({ spread }: { spread: Spread }) {
       <div className="detail-layout-stage starfield">
         <span className="detail-stage-label">SPREAD LAYOUT</span>
         <span className="detail-layout-glow" aria-hidden="true" />
-        <div className="detail-layout-area" style={{ height }}>
+        <div
+          className="detail-layout-area"
+          style={{ height, "--detail-mobile-height": `${mobileHeight}px` } as CSSProperties}
+        >
           {spread.positions.map((position, index) => (
             <div
               className="detail-layout-position"
@@ -3152,6 +3166,21 @@ export default function TarotApp({
               onClick={() => openLogin("nav")}
             >
               <GoogleLogo size={16} />
+              <span className="mobile-account-glyph" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+                </svg>
+              </span>
               <span>Sign in</span>
             </button>
           )}
@@ -3373,13 +3402,41 @@ export default function TarotApp({
 
 	      {route === "detail" && (
 	        <main className="page detail-page">
-	          <a
-	            className="detail-back-link"
-	            href="/#spreads"
-	            onClick={(event) => handleClientLink(event, beginAtSpreads)}
-	          >
-	            ‹ All spreads
-	          </a>
+	          <nav className="detail-breadcrumb" aria-label="Breadcrumb">
+	            <a href="/" onClick={(event) => handleClientLink(event, goHome)}>
+	              Home
+	            </a>
+	            <svg
+	              viewBox="0 0 24 24"
+	              width="13"
+	              height="13"
+	              fill="none"
+	              stroke="currentColor"
+	              strokeWidth="2"
+	              strokeLinecap="round"
+	              strokeLinejoin="round"
+	              aria-hidden="true"
+	            >
+	              <path d="M9 6l6 6-6 6" />
+	            </svg>
+	            <a href="/#spreads" onClick={(event) => handleClientLink(event, beginAtSpreads)}>
+	              Spreads
+	            </a>
+	            <svg
+	              viewBox="0 0 24 24"
+	              width="13"
+	              height="13"
+	              fill="none"
+	              stroke="currentColor"
+	              strokeWidth="2"
+	              strokeLinecap="round"
+	              strokeLinejoin="round"
+	              aria-hidden="true"
+	            >
+	              <path d="M9 6l6 6-6 6" />
+	            </svg>
+	            <span aria-current="page">{spread.name}</span>
+	          </nav>
 	          <header className="detail-header">
 	            <h1 className="serif detail-title">{spread.name}</h1>
 	            <div className="detail-meta">
@@ -3893,8 +3950,8 @@ export default function TarotApp({
 	      <nav className="mobile-tabbar" aria-label="Mobile navigation">
 	        <a
 	          className={route !== "history" ? "active" : ""}
-	          href="/"
-	          onClick={(event) => handleClientLink(event, goHome)}
+	          href="/#spreads"
+	          onClick={(event) => handleClientLink(event, beginAtSpreads)}
 	        >
           <svg
             width="22"
@@ -3912,7 +3969,7 @@ export default function TarotApp({
             <rect x="4" y="14" width="6" height="6" rx="1.2" />
             <rect x="14" y="14" width="6" height="6" rx="1.2" />
 	          </svg>
-	          <span>Home</span>
+	          <span>Spreads</span>
 	        </a>
 	        <a
 	          className={route === "history" ? "active" : ""}
@@ -3932,8 +3989,35 @@ export default function TarotApp({
           >
             <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.6L6 20V5a1 1 0 0 1 1-1z" />
 	          </svg>
-	          <span>Readings</span>
+	          <span>Journal</span>
 	        </a>
+	        <button
+	          className={profileOpen || route === "about" || route === "privacy" || route === "contact" ? "active" : ""}
+	          type="button"
+	          onClick={() => {
+	            if (user) {
+	              setProfileOpen((open) => !open);
+	            } else {
+	              openLogin("mobile_account");
+	            }
+	          }}
+	        >
+	          <svg
+	            width="22"
+	            height="22"
+	            viewBox="0 0 24 24"
+	            fill="none"
+	            stroke="currentColor"
+	            strokeWidth="1.8"
+	            strokeLinecap="round"
+	            strokeLinejoin="round"
+	            aria-hidden="true"
+	          >
+	            <circle cx="12" cy="8" r="3.4" />
+	            <path d="M5 20a7.4 7.4 0 0 1 14 0" />
+	          </svg>
+	          <span>Account</span>
+	        </button>
 	      </nav>
 
       {authOpen && (
