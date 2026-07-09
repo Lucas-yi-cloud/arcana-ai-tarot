@@ -7,9 +7,11 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { inferSpreadIdForQuestion } from "@/lib/spread-inference";
 import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
 import { spreadDescription, spreadTitle } from "@/lib/structured-data";
 import { siteBaseUrl, siteDescription, siteTitle, spreadSeoMeta } from "@/lib/tarot-seo";
@@ -1766,7 +1768,7 @@ export default function TarotApp({
   const [cards, setCards] = useState<DrawnCard[]>([]);
   const [drawPhase, setDrawPhase] = useState<DrawPhase>("idle");
   const [user, setUser] = useState<User | null>(null);
-  const [freeLimit, setFreeLimit] = useState(1);
+  const [freeLimit, setFreeLimit] = useState(2);
   const [guestFreeUsed, setGuestFreeUsed] = useState(0);
   const [authOpen, setAuthOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
@@ -1984,14 +1986,26 @@ export default function TarotApp({
     setAuthOpen(true);
   }
 
-  function openPaywall(src: PaywallSource) {
+  function openPaywall(
+    src: PaywallSource,
+    resume: Partial<{ pendingDraw: boolean; spreadId: string; question: string }> = {}
+  ) {
+    const resumePendingDraw = resume.pendingDraw ?? pendingDraw;
+    const resumeSpreadId = resume.spreadId ?? spreadId;
+    const resumeQuestion = resume.question ?? question;
     setPaywallSrc(src);
     setCheckoutMessage("");
     setCheckoutBusy(false);
     if (!user) {
       window.sessionStorage.setItem(
         pendingSubscribeKey,
-        JSON.stringify({ plan: selectedPlan, paywallSrc: src, pendingDraw, spreadId, question })
+        JSON.stringify({
+          plan: selectedPlan,
+          paywallSrc: src,
+          pendingDraw: resumePendingDraw,
+          spreadId: resumeSpreadId,
+          question: resumeQuestion,
+        })
       );
       setShowPaywall(false);
       openLogin(`paywall_${src}`);
@@ -2425,8 +2439,30 @@ export default function TarotApp({
     }, 0);
   }
 
-  function startFreeReading() {
-    openSpread("past-present-future");
+  function askFromHero() {
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion) {
+      flash("Type your question to begin.");
+      document.getElementById("hero-question")?.focus();
+      return;
+    }
+
+    const inferredSpreadId = inferSpreadIdForQuestion(trimmedQuestion);
+    const inferredSpread = spreads.find((item) => item.id === inferredSpreadId) ?? spreads[2];
+    setQuestion(trimmedQuestion);
+    setSpreadId(inferredSpread.id);
+    track("spread_click", {
+      spread_id: inferredSpread.id,
+      source: "hero_ask",
+      question_length: trimmedQuestion.length,
+    });
+    void beginDraw(inferredSpread, { source: "hero_ask" });
+  }
+
+  function handleHeroQuestionKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    askFromHero();
   }
 
   function goRoute(nextRoute: Route) {
@@ -2435,35 +2471,46 @@ export default function TarotApp({
     window.scrollTo({ top: 0 });
   }
 
-  function startDrawAnimation() {
+  function startDrawAnimation(readingSpread: Spread = spread) {
+    setSpreadId(readingSpread.id);
     setAiSynthesis("");
     setResultLoading(false);
     setRoute("draw");
+    pushRoutePath("draw", readingSpread);
     setDrawPhase("shuffling");
     setCards([]);
-    track("draw_start");
+    track("draw_start", { spread_id: readingSpread.id });
     window.scrollTo({ top: 0 });
     window.setTimeout(() => {
-      setCards(drawCards(spread));
+      setCards(drawCards(readingSpread));
       setDrawPhase("dealt");
-      track("draw_complete");
+      track("draw_complete", { spread_id: readingSpread.id });
     }, shuffleDurationMs);
   }
 
-  async function beginDraw() {
+  async function beginDraw(
+    readingSpread: Spread = spread,
+    options: { source?: string } = {}
+  ) {
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion) {
       flash("Please enter your question first.");
       return;
     }
+    if (readingSpread.id !== spreadId) setSpreadId(readingSpread.id);
     track("question_submit", {
       question_length: trimmedQuestion.length,
-      source: route === "detail" ? "detail_ask" : route,
+      source: options.source ?? (route === "detail" ? "detail_ask" : route),
+      spread_id: readingSpread.id,
     });
 
     if (!isSubscribed && effectiveFreeUsed >= freeLimit) {
       setPendingDraw(true);
-      openPaywall("draw_limit");
+      openPaywall("draw_limit", {
+        pendingDraw: true,
+        spreadId: readingSpread.id,
+        question: trimmedQuestion,
+      });
       return;
     }
 
@@ -2471,7 +2518,11 @@ export default function TarotApp({
       const response = await fetch("/api/readings/begin", { method: "POST" });
       if (response.status === 402) {
         setPendingDraw(true);
-        openPaywall("draw_limit");
+        openPaywall("draw_limit", {
+          pendingDraw: true,
+          spreadId: readingSpread.id,
+          question: trimmedQuestion,
+        });
         return;
       }
       if (!response.ok) {
@@ -2480,7 +2531,7 @@ export default function TarotApp({
       }
     }
 
-    startDrawAnimation();
+    startDrawAnimation(readingSpread);
   }
 
   async function revealReading() {
@@ -2832,28 +2883,51 @@ export default function TarotApp({
                     boxShadow: "0 0 8px var(--gold-bright)",
                   }}
                 />
-                PRO TAROT READING
+                FREE AI TAROT READING
               </div>
               <h1 className="serif">
-                Ask the cards<span style={{ color: "#cdbff0" }}>.</span>
+                What would you like
                 <br />
-                Hear what you
-                <br className="hero-break-desktop" />
-                {" "}
-                <span style={{ color: "#e0d8ff", fontStyle: "italic" }}>already know.</span>
+                <span style={{ color: "#e0d8ff", fontStyle: "italic" }}>guidance</span> on today?
               </h1>
 	              <p>
-	                Hold your question, draw the Rider-Waite deck, and get a clear, personal
-	                reading in under a minute — no sign-up needed.
+	                Type your question and draw the real Rider-Waite deck. We&apos;ll read the
+	                spread that fits what you&apos;re asking — no sign-up needed.
 	              </p>
-	              <button
-	                className="white-btn"
-	                onClick={startFreeReading}
-	              >
-	                Start a free reading →
-	              </button>
+	              <div className="hero-question-card">
+	                <textarea
+	                  id="hero-question"
+	                  value={question}
+	                  onChange={(event) => setQuestion(event.target.value)}
+	                  onKeyDown={handleHeroQuestionKeyDown}
+	                  placeholder="Ask the cards anything... e.g. Where is this relationship heading?"
+	                  rows={2}
+	                />
+	                <div className="hero-question-actions">
+	                  <span>We&apos;ll choose the spread that fits</span>
+	                  <button type="button" onClick={askFromHero}>
+	                    <span>Start my reading</span>
+	                    <svg
+	                      width="16"
+	                      height="16"
+	                      viewBox="0 0 24 24"
+	                      fill="none"
+	                      stroke="currentColor"
+	                      strokeWidth="2"
+	                      strokeLinecap="round"
+	                      aria-hidden="true"
+	                    >
+	                      <path d="M5 12h14M13 6l6 6-6 6" />
+	                    </svg>
+	                  </button>
+	                </div>
+	              </div>
 	              <div className="hero-trust" aria-label="Reading benefits">
-	                <span>First reading free</span>
+	                <span>
+	                  {isSubscribed
+	                    ? "Unlimited readings"
+	                    : `${freeReadingsLeft} free reading${freeReadingsLeft === 1 ? "" : "s"} left`}
+	                </span>
 	                <span>No sign-up to start</span>
 	                <span>Real Rider-Waite deck</span>
 	              </div>

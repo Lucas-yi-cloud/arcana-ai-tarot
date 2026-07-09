@@ -562,9 +562,9 @@ button {
 
 .hero h1 {
   margin: 0 0 18px;
-  font-size: 60px;
+  font-size: 50px;
   font-weight: 500;
-  line-height: 1.02;
+  line-height: 1.05;
   letter-spacing: 0;
 }
 
@@ -574,10 +574,77 @@ button {
 
 .hero p {
   max-width: 440px;
-  margin: 0 0 28px;
+  margin: 0 0 22px;
   color: rgba(255, 255, 255, 0.72);
   font-size: 17px;
   line-height: 1.5;
+}
+
+.hero-question-card {
+  max-width: 520px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 16px 44px rgba(10, 6, 25, 0.4);
+}
+
+.hero-question-card:focus-within {
+  box-shadow: 0 18px 50px rgba(10, 6, 25, 0.46), 0 0 0 2px rgba(253, 223, 26, 0.22);
+}
+
+.hero-question-card textarea {
+  display: block;
+  width: 100%;
+  min-height: 62px;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #1f1736;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.hero-question-card textarea::placeholder {
+  color: rgba(31, 23, 54, 0.42);
+}
+
+.hero-question-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(31, 23, 54, 0.08);
+}
+
+.hero-question-actions > span {
+  color: #89878e;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+
+.hero-question-actions button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #1f1736;
+  color: #fff;
+  cursor: pointer;
+  padding: 10px 20px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.hero-question-actions button:hover {
+  background: #2c204f;
 }
 
 .hero-trust {
@@ -3447,7 +3514,7 @@ button {
 
   .hero {
     min-height: auto;
-    padding: 42px 26px 220px;
+    padding: 42px 26px 238px;
   }
 
   .hero h1 {
@@ -3635,8 +3702,8 @@ button {
   }
 
   .hero {
-    min-height: 444px;
-    padding: 30px 22px 156px;
+    min-height: 552px;
+    padding: 28px 22px 190px;
   }
 
   .hero-content {
@@ -3644,8 +3711,8 @@ button {
   }
 
   .hero h1 {
-    margin-bottom: 16px;
-    font-size: 29px;
+    margin-bottom: 10px;
+    font-size: 30px;
     line-height: 1.08;
   }
 
@@ -3655,10 +3722,35 @@ button {
 
 	  .hero p {
 	    max-width: 100%;
-	    margin-bottom: 22px;
-	    font-size: 16px;
+	    margin-bottom: 16px;
+	    font-size: 14px;
 	    line-height: 1.5;
 	  }
+
+  .hero-question-card {
+    padding: 12px 12px 10px;
+    border-radius: 16px;
+  }
+
+  .hero-question-card textarea {
+    min-height: 56px;
+    font-size: 15px;
+  }
+
+  .hero-question-actions {
+    gap: 10px;
+    margin-top: 2px;
+  }
+
+  .hero-question-actions > span {
+    font-size: 11.5px;
+  }
+
+  .hero-question-actions button {
+    gap: 7px;
+    padding: 10px 18px;
+    font-size: 14px;
+  }
 
 	  .hero-trust {
 	    display: none;
