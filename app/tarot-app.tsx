@@ -1578,6 +1578,7 @@ function SiteFooter({
           <div className="footer-title">ARCANA</div>
           <div className="footer-links">
             <button onClick={onOpenPaywall}>Arcana Pro</button>
+            <a href="/card">Card meanings</a>
             <a href="/about" onClick={(event) => handleClientLink(event, () => onRoute("about"))}>
               About
             </a>
@@ -2714,13 +2715,16 @@ export default function TarotApp({
           >
             Spreads
           </a>
-	          <a
-	            className={`nav-pill ${route === "history" ? "active" : ""}`}
-	            href="/journals"
-	            onClick={(event) => handleClientLink(event, () => goRoute("history"))}
-	          >
-	            Readings
-	          </a>
+          <a className="nav-pill" href="/card">
+            Cards
+          </a>
+          <a
+            className={`nav-pill ${route === "history" ? "active" : ""}`}
+            href="/journals"
+            onClick={(event) => handleClientLink(event, () => goRoute("history"))}
+          >
+            Readings
+          </a>
         </div>
         <div className="account-actions">
           {user?.subscribed ? (

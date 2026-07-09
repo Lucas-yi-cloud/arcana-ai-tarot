@@ -1,5 +1,15 @@
 import { cardImage, spreads, type Spread } from "@/lib/tarot-data";
 import {
+  cardIndexDescription,
+  cardIndexFaq,
+  cardIndexTitle,
+  cardMeaningDescription,
+  cardMeaningPath,
+  cardMeaningTitle,
+  tarotCardMeanings,
+  type TarotCardMeaning,
+} from "@/lib/tarot-card-meanings";
+import {
   clampSeoDescription,
   siteBaseUrl,
   siteDescription,
@@ -153,6 +163,169 @@ export function staticPageStructuredData({
       isPartOf: { "@id": websiteId },
       breadcrumb: { "@id": breadcrumbId },
       publisher: { "@id": organizationId },
+    },
+  ]);
+}
+
+export function cardIndexStructuredData() {
+  const url = absoluteUrl("/card");
+  const webpageId = `${url}#webpage`;
+  const breadcrumbId = `${url}#breadcrumb`;
+  const itemListId = `${url}#major-arcana`;
+  const faqId = `${url}#faq`;
+
+  return graph([
+    organizationSchema(),
+    websiteSchema(),
+    {
+      "@type": "BreadcrumbList",
+      "@id": breadcrumbId,
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: `${siteBaseUrl}/`,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Tarot Cards",
+          item: url,
+        },
+      ],
+    },
+    {
+      "@type": "CollectionPage",
+      "@id": webpageId,
+      url,
+      name: cardIndexTitle,
+      description: cardIndexDescription,
+      inLanguage: "en",
+      isPartOf: { "@id": websiteId },
+      breadcrumb: { "@id": breadcrumbId },
+      mainEntity: { "@id": itemListId },
+      publisher: { "@id": organizationId },
+    },
+    {
+      "@type": "ItemList",
+      "@id": itemListId,
+      name: "Major Arcana tarot card meanings",
+      itemListOrder: "https://schema.org/ItemListOrderAscending",
+      numberOfItems: tarotCardMeanings.length,
+      itemListElement: tarotCardMeanings.map((card, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: `${card.name} Tarot Card Meaning`,
+        url: absoluteUrl(cardMeaningPath(card)),
+        description: card.oneLine,
+      })),
+    },
+    {
+      "@type": "FAQPage",
+      "@id": faqId,
+      mainEntity: cardIndexFaq.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.a,
+        },
+      })),
+    },
+  ]);
+}
+
+export function cardMeaningStructuredData(card: TarotCardMeaning) {
+  const url = absoluteUrl(cardMeaningPath(card));
+  const title = cardMeaningTitle(card);
+  const description = cardMeaningDescription(card);
+  const image = absoluteUrl(card.image);
+  const webpageId = `${url}#webpage`;
+  const articleId = `${url}#article`;
+  const breadcrumbId = `${url}#breadcrumb`;
+  const faqId = `${url}#faq`;
+
+  return graph([
+    organizationSchema(),
+    websiteSchema(),
+    {
+      "@type": "BreadcrumbList",
+      "@id": breadcrumbId,
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Home",
+          item: `${siteBaseUrl}/`,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "Tarot Cards",
+          item: absoluteUrl("/card"),
+        },
+        {
+          "@type": "ListItem",
+          position: 3,
+          name: `${card.name} Tarot Card Meaning`,
+          item: url,
+        },
+      ],
+    },
+    {
+      "@type": "WebPage",
+      "@id": webpageId,
+      url,
+      name: title,
+      description,
+      inLanguage: "en",
+      isPartOf: { "@id": websiteId },
+      breadcrumb: { "@id": breadcrumbId },
+      primaryImageOfPage: {
+        "@type": "ImageObject",
+        url: image,
+      },
+      mainEntity: { "@id": articleId },
+      publisher: { "@id": organizationId },
+    },
+    {
+      "@type": "Article",
+      "@id": articleId,
+      headline: title,
+      description,
+      image,
+      datePublished: "2026-07-09",
+      dateModified: "2026-07-09",
+      author: { "@id": organizationId },
+      publisher: { "@id": organizationId },
+      mainEntityOfPage: { "@id": webpageId },
+      articleSection: "Tarot card meanings",
+      inLanguage: "en",
+      about: [
+        "Major Arcana",
+        "Rider-Waite tarot",
+        `${card.name} tarot card`,
+        "upright and reversed tarot meanings",
+      ],
+      keywords: [
+        `${card.name} tarot card meaning`,
+        `${card.name} upright`,
+        `${card.name} reversed`,
+        ...card.keywords,
+      ],
+    },
+    {
+      "@type": "FAQPage",
+      "@id": faqId,
+      mainEntity: card.faqs.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.a,
+        },
+      })),
     },
   ]);
 }
