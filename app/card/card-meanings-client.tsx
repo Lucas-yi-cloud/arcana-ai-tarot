@@ -1,14 +1,10 @@
-"use client";
-
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 
-import { useState } from "react";
+import { CardMeaningHero } from "@/app/card/card-meaning-hero";
 import { spreads } from "@/lib/tarot-data";
 import {
-  cardIndexFaq,
   cardMeaningPath,
   findTarotCardMeaning,
-  tarotCardMeanings,
   type TarotCardMeaning,
 } from "@/lib/tarot-card-meanings";
 
@@ -143,109 +139,7 @@ function FaqList({ items }: { items: Array<{ q: string; a: string }> }) {
   );
 }
 
-function CardGrid() {
-  return (
-    <div className="cm-card-grid">
-      {tarotCardMeanings.map((card) => (
-        <a className="cm-grid-card" href={cardMeaningPath(card)} key={card.slug}>
-          <div className="cm-grid-image">
-            <img src={card.image} alt={`${card.name} tarot card`} loading="lazy" />
-            <span>{card.roman}</span>
-          </div>
-          <div className="cm-grid-copy">
-            <h3>{card.name}</h3>
-            <div>
-              {card.keywords.map((keyword) => (
-                <em key={keyword}>{keyword}</em>
-              ))}
-            </div>
-            <b>
-              View meaning <ArrowIcon />
-            </b>
-          </div>
-        </a>
-      ))}
-    </div>
-  );
-}
-
-export function CardMeaningsIndex() {
-  return (
-    <div className="cm-page">
-      <CardTopNav />
-      <main className="cm-container">
-        <section className="cm-hero cm-index-hero">
-          <div className="cm-starfield" aria-hidden="true" />
-          <div className="cm-hero-copy">
-            <span className="cm-eyebrow gold">TAROT CARD MEANINGS</span>
-            <h1 className="serif">Tarot Card Meanings</h1>
-            <p>
-              Explore the 22 Major Arcana cards used in Arcana AI readings. Learn each card&apos;s upright and reversed meanings, how it speaks in love, career, money, and yes or no questions, and how the meaning changes by spread position.
-            </p>
-            <div className="cm-actions">
-              <a className="cm-button primary" href="/#spreads">
-                Start a free AI tarot reading <ArrowIcon />
-              </a>
-              <a className="cm-button ghost" href="/#spreads">
-                Browse tarot spreads
-              </a>
-            </div>
-          </div>
-          <div className="cm-hero-fan" aria-hidden="true">
-            <img className="left" src="/assets/tarot/RWS_Tarot_17_Star.jpg" alt="" />
-            <img className="right" src="/assets/tarot/RWS_Tarot_19_Sun.jpg" alt="" />
-            <img className="center" src="/assets/tarot/RWS_Tarot_00_Fool.jpg" alt="" />
-          </div>
-        </section>
-
-        <section className="cm-intro">
-          <h2 className="serif">What are the Major Arcana?</h2>
-          <p>
-            The Major Arcana are the 22 archetypal cards of the tarot deck. They represent turning points, inner lessons, life chapters, and symbolic forces that shape a reading. Arcana AI currently reads from the Major Arcana because these cards carry clear, memorable themes that work well for focused online tarot readings.
-          </p>
-        </section>
-
-        <section className="cm-grid-section" aria-labelledby="major-arcana-heading">
-          <div className="cm-section-head">
-            <h2 id="major-arcana-heading" className="serif">The 22 Major Arcana</h2>
-            <span>00 — 21</span>
-          </div>
-          <CardGrid />
-        </section>
-
-        <section className="cm-learning">
-          <div>
-            <span className="cm-eyebrow">READING BASICS</span>
-            <h2 className="serif">How to read upright and reversed cards</h2>
-          </div>
-          <p>
-            An upright card usually expresses its energy directly. A reversed card does not always mean the opposite. It can show blocked energy, an inward version of the card, delay, resistance, or a lesson that needs more attention. Arcana AI reads reversals in context with your question and the card&apos;s position in the spread.
-          </p>
-        </section>
-
-        <section className="cm-cta">
-          <h2 className="serif">Want to know what a card means for your question?</h2>
-          <p>
-            A card meaning changes when it appears in a real spread. Draw the cards, hold your question, and let Arcana AI interpret the position, orientation, and whole story together.
-          </p>
-          <a className="cm-button primary" href="/spread/past-present-future">
-            Start a free AI tarot reading <ArrowIcon />
-          </a>
-        </section>
-
-        <section className="cm-faq-section" aria-labelledby="card-faq-heading">
-          <h2 id="card-faq-heading" className="serif">Frequently asked questions</h2>
-          <FaqList items={cardIndexFaq} />
-        </section>
-      </main>
-      <CardFooter />
-    </div>
-  );
-}
-
 export function CardMeaningDetail({ card }: { card: TarotCardMeaning }) {
-  const [orientation, setOrientation] = useState<"upright" | "reversed">("upright");
-  const isReversed = orientation === "reversed";
   const related = card.related
     .map((slug) => findTarotCardMeaning(slug))
     .filter((item): item is TarotCardMeaning => Boolean(item));
@@ -264,40 +158,14 @@ export function CardMeaningDetail({ card }: { card: TarotCardMeaning }) {
         </nav>
         <a className="cm-back-link" href="/card">‹ All tarot cards</a>
 
-        <section className="cm-hero cm-detail-hero">
-          <div className="cm-starfield" aria-hidden="true" />
-          <div className="cm-card-frame-wrap">
-            <div className="cm-card-frame" style={{ transform: `rotate(${isReversed ? 180 : 0}deg)` }}>
-              <img src={card.image} alt={`${card.name} tarot card`} />
-            </div>
-          </div>
-          <div className="cm-detail-copy">
-            <span className="cm-eyebrow gold">MAJOR ARCANA · {card.num}</span>
-            <h1 className="serif">{card.name} Tarot Card Meaning</h1>
-            <p>{card.oneLine}</p>
-            <div className="cm-toggle" aria-label="Card orientation">
-              <button className={!isReversed ? "active" : ""} onClick={() => setOrientation("upright")}>
-                Upright
-              </button>
-              <button className={isReversed ? "active" : ""} onClick={() => setOrientation("reversed")}>
-                Reversed
-              </button>
-            </div>
-            <div className={`cm-keywords ${isReversed ? "reversed" : "upright"}`}>
-              {(isReversed ? card.reversedKeywords : card.upKeywords).map((keyword) => (
-                <span key={keyword}>{keyword}</span>
-              ))}
-            </div>
-            <div className="cm-actions">
-              <a className="cm-button primary" href="/#spreads">
-                Ask the cards <ArrowIcon />
-              </a>
-              <a className="cm-button ghost" href="/card">
-                All card meanings
-              </a>
-            </div>
-          </div>
-        </section>
+        <CardMeaningHero
+          image={card.image}
+          name={card.name}
+          num={card.num}
+          oneLine={card.oneLine}
+          upKeywords={card.upKeywords}
+          reversedKeywords={card.reversedKeywords}
+        />
 
         <section className="cm-overview">
           <span className="cm-eyebrow">OVERVIEW</span>
@@ -360,7 +228,7 @@ export function CardMeaningDetail({ card }: { card: TarotCardMeaning }) {
           <div className="cm-related-grid">
             {related.map((relatedCard) => (
               <a href={cardMeaningPath(relatedCard)} key={relatedCard.slug}>
-                <img src={relatedCard.image} alt={`${relatedCard.name} tarot card`} loading="lazy" />
+                <img src={relatedCard.image} alt={`${relatedCard.name} tarot card`} loading="lazy" decoding="async" fetchPriority="low" />
                 <span>{relatedCard.roman}</span>
                 <strong>{relatedCard.name}</strong>
                 <i>›</i>

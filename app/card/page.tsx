@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import JsonLd from "@/app/json-ld";
-import { CardMeaningsIndex } from "@/app/card/card-meanings-client";
+import { CardMeaningsIndex } from "@/app/card/card-meanings-index";
 import { cardIndexStructuredData } from "@/lib/structured-data";
 import {
   cardIndexDescription,
