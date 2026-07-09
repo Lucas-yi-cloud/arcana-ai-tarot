@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import { FooterInstagramLink } from "@/app/footer-social-link";
+import { sendAnalyticsEvent, type AnalyticsPayload } from "@/lib/analytics";
 import { inferSpreadIdForQuestion } from "@/lib/spread-inference";
 import { cardImage, deck, spreads, type Spread, type TarotCard } from "@/lib/tarot-data";
 import { spreadDescription, spreadTitle } from "@/lib/structured-data";
@@ -34,16 +35,45 @@ type Plan = "year" | "quarter";
 type PaywallSource = "nav" | "result" | "draw_limit" | "new_reading" | "followup";
 type TrackEvent =
   | "landing_view"
+  | "route_view"
+  | "home_question_submit"
+  | "spread_inferred"
+  | "spread_view"
   | "spread_click"
+  | "prompt_pick"
   | "question_submit"
+  | "reading_limit_hit"
+  | "reading_begin_error"
   | "draw_start"
   | "draw_complete"
+  | "card_reveal"
+  | "card_reveal_all"
+  | "reveal_click"
+  | "interpret_start"
+  | "interpret_success"
+  | "interpret_error"
   | "result_view"
+  | "followup_click"
+  | "upsell_click"
+  | "new_reading_click"
+  | "journal_save_click"
+  | "journal_save_success"
+  | "journal_save_error"
+  | "paywall_login_required"
   | "paywall_view"
   | "paywall_cta_click"
+  | "paywall_close"
   | "plan_select"
+  | "login_modal_view"
   | "login_start"
+  | "login_google_click"
+  | "login_email_code_request"
+  | "login_email_code_sent"
+  | "login_email_code_error"
+  | "login_email_verify_start"
   | "login_success"
+  | "login_error"
+  | "login_modal_close"
   | "begin_checkout"
   | "checkout_start"
   | "checkout_success"
@@ -138,6 +168,14 @@ type ConfirmCheckoutResponse = {
 type ReadingProfile = {
   readerName: string;
   birthDate: string;
+};
+
+type ReadingJourney = {
+  readingId: string;
+  entrySource: string;
+  spreadId: string;
+  questionLength: number;
+  startedAt: number;
 };
 
 type TarotAppProps = {
@@ -311,6 +349,7 @@ const pendingSubscribeKey = "arcana.pendingSubscribe";
 const guestFreeUsedKey = "aitarot.freeUsed";
 const pendingSaveKey = "arcana.pendingSave";
 const pendingSavePayloadKey = "arcana.pendingSavePayload";
+const readingJourneyKey = "arcana.readingJourney";
 const shuffleDurationMs = 5000;
 const dobMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dobMonthIndexes = dobMonths.map((_, index) => index);
@@ -387,6 +426,44 @@ function routePath(route: Route, spread: Spread) {
 function absoluteRouteUrl(route: Route, spread: Spread) {
   const path = routePath(route, spread);
   return path === "/" ? siteBaseUrl : `${siteBaseUrl}${path}`;
+}
+
+function analyticsRoutePath(route: Route, spread: Spread) {
+  const path = routePath(route, spread);
+  if (route === "question" || route === "draw" || route === "result") {
+    return `${path}?step=${route}`;
+  }
+  return path;
+}
+
+function absoluteAnalyticsRouteUrl(route: Route, spread: Spread) {
+  const path = analyticsRoutePath(route, spread);
+  return path === "/" ? siteBaseUrl : `${siteBaseUrl}${path}`;
+}
+
+function pageTypeForRoute(route: Route) {
+  if (route === "home") return "home";
+  if (route === "detail") return "spread_detail";
+  if (route === "question") return "reading_question";
+  if (route === "draw") return "reading_draw";
+  if (route === "result") return "reading_result";
+  if (route === "history") return "journal";
+  return route;
+}
+
+function routeAnalyticsParams(route: Route, spread: Spread): AnalyticsPayload {
+  return {
+    page_location: absoluteAnalyticsRouteUrl(route, spread),
+    page_path: analyticsRoutePath(route, spread),
+    page_title: documentTitleForRoute(route, spread),
+    route,
+    page_type: pageTypeForRoute(route),
+    canonical_url: absoluteRouteUrl(route, spread),
+  };
+}
+
+function analyticsId(prefix: string) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function handleClientLink(event: ReactMouseEvent<HTMLAnchorElement>, action: () => void) {
@@ -1796,6 +1873,8 @@ export default function TarotApp({
   const [openFaq, setOpenFaq] = useState(-1);
   const beginDrawRef = useRef<() => Promise<void>>(async () => undefined);
   const latestSavePayloadRef = useRef<SaveReadingPayload | null>(null);
+  const readingJourneyRef = useRef<ReadingJourney | null>(null);
+  const lastRouteViewRef = useRef("");
 
   const spread = useMemo(
     () => spreads.find((item) => item.id === spreadId) ?? spreads[0],
@@ -1847,31 +1926,96 @@ export default function TarotApp({
   const freeReadingsLeft = Math.max(0, freeLimit - effectiveFreeUsed);
   const isSubscribed = Boolean(user?.subscribed);
 
-  function track(event: TrackEvent, params: Record<string, unknown> = {}) {
-    const search = new URLSearchParams(window.location.search);
+  function readStoredReadingJourney() {
+    if (readingJourneyRef.current) return readingJourneyRef.current;
+    try {
+      const raw = window.sessionStorage.getItem(readingJourneyKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<ReadingJourney>;
+      if (
+        typeof parsed.readingId !== "string" ||
+        typeof parsed.entrySource !== "string" ||
+        typeof parsed.spreadId !== "string" ||
+        typeof parsed.questionLength !== "number" ||
+        typeof parsed.startedAt !== "number"
+      ) {
+        return null;
+      }
+      const journey: ReadingJourney = {
+        readingId: parsed.readingId,
+        entrySource: parsed.entrySource,
+        spreadId: parsed.spreadId,
+        questionLength: parsed.questionLength,
+        startedAt: parsed.startedAt,
+      };
+      readingJourneyRef.current = journey;
+      return journey;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeReadingJourney(journey: ReadingJourney) {
+    readingJourneyRef.current = journey;
+    try {
+      window.sessionStorage.setItem(readingJourneyKey, JSON.stringify(journey));
+    } catch {
+      // Analytics persistence should never interrupt a reading.
+    }
+  }
+
+  function startReadingJourney(entrySource: string, readingSpread: Spread, trimmedQuestion: string) {
+    const existing = readStoredReadingJourney();
+    if (
+      existing &&
+      existing.spreadId === readingSpread.id &&
+      existing.questionLength === trimmedQuestion.length
+    ) {
+      return existing;
+    }
+
+    const journey: ReadingJourney = {
+      readingId: analyticsId("read"),
+      entrySource,
+      spreadId: readingSpread.id,
+      questionLength: trimmedQuestion.length,
+      startedAt: Date.now(),
+    };
+    writeReadingJourney(journey);
+    return journey;
+  }
+
+  function clearReadingJourney() {
+    readingJourneyRef.current = null;
+    window.sessionStorage.removeItem(readingJourneyKey);
+  }
+
+  function readingJourneyParams(journey = readStoredReadingJourney()) {
+    return {
+      reading_id: journey?.readingId ?? "",
+      reading_entry_source: journey?.entrySource ?? "",
+      reading_started_at: journey?.startedAt ?? 0,
+    };
+  }
+
+  function track(event: TrackEvent, params: AnalyticsPayload = {}) {
     const payload = {
+      event_name: event,
       page_url: window.location.href,
-      referrer: document.referrer || "",
-      utm_source: search.get("utm_source") || "",
-      utm_campaign: search.get("utm_campaign") || "",
-      utm_term: search.get("utm_term") || "",
+      ...routeAnalyticsParams(route, spread),
       user_status: userStatus,
+      is_subscribed: isSubscribed,
+      free_readings_used: effectiveFreeUsed,
       free_readings_left: freeReadingsLeft,
       spread_id: spread.id,
+      spread_name: spread.name,
+      spread_card_count: spread.count,
       device_type: window.matchMedia("(max-width: 760px)").matches ? "mobile" : "desktop",
-      timestamp: new Date().toISOString(),
+      event_time: new Date().toISOString(),
+      ...readingJourneyParams(),
       ...params,
     };
-    const win = window as typeof window & {
-      dataLayer?: Array<Record<string, unknown>>;
-      gtag?: (command: "event", eventName: string, params: Record<string, unknown>) => void;
-    };
-    if (typeof win.gtag === "function") {
-      win.gtag("event", event, payload);
-    } else {
-      win.dataLayer = win.dataLayer || [];
-      win.dataLayer.push({ event, ...payload });
-    }
+    sendAnalyticsEvent(event, payload);
   }
 
   function isPlan(value: unknown): value is Plan {
@@ -1985,6 +2129,7 @@ export default function TarotApp({
 
   function openLogin(trigger: string) {
     track("login_start", { trigger });
+    track("login_modal_view", { trigger });
     setAuthOpen(true);
   }
 
@@ -1999,6 +2144,12 @@ export default function TarotApp({
     setCheckoutMessage("");
     setCheckoutBusy(false);
     if (!user) {
+      track("paywall_login_required", {
+        paywall_src: src,
+        pending_draw: resumePendingDraw,
+        resume_spread_id: resumeSpreadId,
+        question_length: resumeQuestion.trim().length,
+      });
       window.sessionStorage.setItem(
         pendingSubscribeKey,
         JSON.stringify({
@@ -2014,11 +2165,19 @@ export default function TarotApp({
       return;
     }
     setShowPaywall(true);
-    track("paywall_view", { paywall_src: src });
+    track("paywall_view", {
+      paywall_src: src,
+      pending_draw: resumePendingDraw,
+      resume_spread_id: resumeSpreadId,
+      question_length: resumeQuestion.trim().length,
+    });
   }
 
   function closePaywall(trackCancel = false) {
-    if (trackCancel) track("checkout_cancel", { paywall_src: paywallSrc });
+    if (trackCancel) {
+      track("paywall_close", { paywall_src: paywallSrc });
+      track("checkout_cancel", { paywall_src: paywallSrc });
+    }
     setShowPaywall(false);
     setPendingDraw(false);
     setCheckoutMessage("");
@@ -2042,12 +2201,36 @@ export default function TarotApp({
     const storedGuestFreeUsed = readGuestFreeUsed();
     window.setTimeout(() => setGuestFreeUsed(storedGuestFreeUsed), 0);
     track("landing_view", {
+      entry_path: window.location.pathname,
       route,
+      page_type: pageTypeForRoute(route),
       free_readings_left: Math.max(0, freeLimit - storedGuestFreeUsed),
     });
     // landing_view should fire once per page load with the entry route.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const nextViewKey = `${route}:${spread.id}`;
+    if (lastRouteViewRef.current === nextViewKey) return;
+    lastRouteViewRef.current = nextViewKey;
+    track("route_view", {
+      route,
+      page_type: pageTypeForRoute(route),
+      page_path: analyticsRoutePath(route, spread),
+      page_location: absoluteAnalyticsRouteUrl(route, spread),
+      is_virtual_step: route === "question" || route === "draw" || route === "result",
+    });
+    if (route === "detail") {
+      track("spread_view", {
+        spread_id: spread.id,
+        spread_name: spread.name,
+        card_count: spread.count,
+      });
+    }
+    // route_view should describe the current product step whenever the SPA route changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, spread.id]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2059,9 +2242,11 @@ export default function TarotApp({
         track("login_success", { method: "google" });
         flash("Signed in with Google.");
       } else if (loginStatus === "google-config") {
+        track("login_error", { method: "google", error_message: "google_not_configured" });
         openLogin("google_config_error");
         setAuthMessage("Google sign-in is not configured yet.");
       } else if (loginStatus === "google-error") {
+        track("login_error", { method: "google", error_message: "google_callback_error" });
         openLogin("google_error");
         setAuthMessage("Google sign-in could not be completed. Please try again.");
       }
@@ -2195,7 +2380,7 @@ export default function TarotApp({
       clearParams();
       window.sessionStorage.removeItem(checkoutResumeKey);
       clearCheckoutIntent();
-      const cancelParams: Record<string, unknown> = {
+      const cancelParams: AnalyticsPayload = {
         paywall_src: intent?.paywallSrc ?? "checkout_return",
       };
       if (intent) {
@@ -2340,7 +2525,14 @@ export default function TarotApp({
         setCheckoutBusy(false);
         setCheckoutMessage("");
         setShowPaywall(true);
-        track("paywall_view", { paywall_src: source, after_login: true });
+        track("paywall_view", {
+          paywall_src: source,
+          after_login: true,
+          pending_draw: shouldResumeDraw,
+          resume_spread_id: resumeSpreadId,
+          question_length: resumeQuestion.trim().length,
+          ...planEventParams(plan, stripeConfig?.prices[plan]),
+        });
       }, 0);
     } catch {
       window.sessionStorage.removeItem(pendingSubscribeKey);
@@ -2364,6 +2556,11 @@ export default function TarotApp({
     if (!options.resumed) track("paywall_cta_click", eventParams);
 
     if (!user) {
+      track("paywall_login_required", {
+        ...eventParams,
+        pending_draw: pendingDraw,
+        trigger: "checkout_cta",
+      });
       window.sessionStorage.setItem(
         pendingSubscribeKey,
         JSON.stringify({ plan, paywallSrc: source, pendingDraw, spreadId, question })
@@ -2418,12 +2615,17 @@ export default function TarotApp({
     }
   }
 
-  function openSpread(id: string) {
+  function openSpread(id: string, source = route === "home" ? "spread_grid" : "related_or_footer") {
     const nextSpread = spreads.find((item) => item.id === id) ?? spread;
     setSpreadId(nextSpread.id);
     setRoute("detail");
     pushRoutePath("detail", nextSpread);
-    track("spread_click", { spread_id: nextSpread.id });
+    track("spread_click", {
+      source,
+      spread_id: nextSpread.id,
+      spread_name: nextSpread.name,
+      card_count: nextSpread.count,
+    });
     window.scrollTo({ top: 0 });
   }
 
@@ -2453,8 +2655,23 @@ export default function TarotApp({
     const inferredSpread = spreads.find((item) => item.id === inferredSpreadId) ?? spreads[2];
     setQuestion(trimmedQuestion);
     setSpreadId(inferredSpread.id);
-    track("spread_click", {
+    const journey = startReadingJourney("home_question", inferredSpread, trimmedQuestion);
+    track("home_question_submit", {
+      ...readingJourneyParams(journey),
+      question_length: trimmedQuestion.length,
+      source: "hero_ask",
+    });
+    track("spread_inferred", {
+      ...readingJourneyParams(journey),
       spread_id: inferredSpread.id,
+      spread_name: inferredSpread.name,
+      question_length: trimmedQuestion.length,
+      source: "hero_ask",
+    });
+    track("spread_click", {
+      ...readingJourneyParams(journey),
+      spread_id: inferredSpread.id,
+      spread_name: inferredSpread.name,
       source: "hero_ask",
       question_length: trimmedQuestion.length,
     });
@@ -2481,12 +2698,20 @@ export default function TarotApp({
     pushRoutePath("draw", readingSpread);
     setDrawPhase("shuffling");
     setCards([]);
-    track("draw_start", { spread_id: readingSpread.id });
+    track("draw_start", {
+      spread_id: readingSpread.id,
+      spread_name: readingSpread.name,
+      card_count: readingSpread.count,
+    });
     window.scrollTo({ top: 0 });
     window.setTimeout(() => {
       setCards(drawCards(readingSpread));
       setDrawPhase("dealt");
-      track("draw_complete", { spread_id: readingSpread.id });
+      track("draw_complete", {
+        spread_id: readingSpread.id,
+        spread_name: readingSpread.name,
+        card_count: readingSpread.count,
+      });
     }, shuffleDurationMs);
   }
 
@@ -2500,13 +2725,25 @@ export default function TarotApp({
       return;
     }
     if (readingSpread.id !== spreadId) setSpreadId(readingSpread.id);
+    const source = options.source ?? (route === "detail" ? "detail_ask" : route);
+    const journey = startReadingJourney(source, readingSpread, trimmedQuestion);
     track("question_submit", {
+      ...readingJourneyParams(journey),
       question_length: trimmedQuestion.length,
-      source: options.source ?? (route === "detail" ? "detail_ask" : route),
+      source,
       spread_id: readingSpread.id,
+      spread_name: readingSpread.name,
+      card_count: readingSpread.count,
     });
 
     if (!isSubscribed && effectiveFreeUsed >= freeLimit) {
+      track("reading_limit_hit", {
+        ...readingJourneyParams(journey),
+        source,
+        spread_id: readingSpread.id,
+        free_readings_used: effectiveFreeUsed,
+        free_readings_left: 0,
+      });
       setPendingDraw(true);
       openPaywall("draw_limit", {
         pendingDraw: true,
@@ -2519,6 +2756,14 @@ export default function TarotApp({
     if (user) {
       const response = await fetch("/api/readings/begin", { method: "POST" });
       if (response.status === 402) {
+        track("reading_limit_hit", {
+          ...readingJourneyParams(journey),
+          source,
+          spread_id: readingSpread.id,
+          free_readings_used: effectiveFreeUsed,
+          free_readings_left: 0,
+          server_gate: true,
+        });
         setPendingDraw(true);
         openPaywall("draw_limit", {
           pendingDraw: true,
@@ -2528,6 +2773,12 @@ export default function TarotApp({
         return;
       }
       if (!response.ok) {
+        track("reading_begin_error", {
+          ...readingJourneyParams(journey),
+          source,
+          spread_id: readingSpread.id,
+          error_code: response.status,
+        });
         flash("Could not start the reading. Please sign in again.");
         return;
       }
@@ -2542,11 +2793,24 @@ export default function TarotApp({
       setRoute("result");
       return;
     }
+    track("reveal_click", {
+      spread_id: spread.id,
+      spread_name: spread.name,
+      card_count: cards.length,
+      question_length: question.trim().length,
+    });
     setRevealing(true);
     setResultLoading(true);
     setRoute("result");
     window.scrollTo({ top: 0 });
     try {
+      track("interpret_start", {
+        ...routeAnalyticsParams("result", spread),
+        spread_id: spread.id,
+        spread_name: spread.name,
+        card_count: cards.length,
+        question_length: question.trim().length,
+      });
       const response = await fetch("/api/readings/interpret", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2559,11 +2823,31 @@ export default function TarotApp({
       });
 
       if (response.status === 401) {
+        track("interpret_error", {
+          ...routeAnalyticsParams("result", spread),
+          spread_id: spread.id,
+          step: "auth_required",
+          error_code: response.status,
+        });
         openLogin("interpret");
         setResultLoading(false);
         return;
       }
       if (response.status === 402) {
+        track("reading_limit_hit", {
+          ...routeAnalyticsParams("result", spread),
+          spread_id: spread.id,
+          source: "interpret",
+          free_readings_used: effectiveFreeUsed,
+          free_readings_left: 0,
+          server_gate: true,
+        });
+        track("interpret_error", {
+          ...routeAnalyticsParams("result", spread),
+          spread_id: spread.id,
+          step: "reading_limit",
+          error_code: response.status,
+        });
         openPaywall("draw_limit");
         setResultLoading(false);
         return;
@@ -2573,6 +2857,13 @@ export default function TarotApp({
         interpretation?: ReadingInterpretation;
       } | null;
       if (!response.ok || !data?.interpretation) {
+        track("interpret_error", {
+          ...routeAnalyticsParams("result", spread),
+          spread_id: spread.id,
+          step: "interpret_response",
+          error_code: response.status,
+          error_message: data?.interpretation ? "" : "missing_interpretation",
+        });
         flash("Could not generate the reading. Please try again.");
         return;
       }
@@ -2595,12 +2886,28 @@ export default function TarotApp({
         setStoredGuestFreeUsed(readGuestFreeUsed() + 1);
       }
       setResultLoading(false);
-      track("result_view", {
+      track("interpret_success", {
+        ...routeAnalyticsParams("result", spread),
         spread_id: spread.id,
+        spread_name: spread.name,
         card_count: cards.length,
+        model: data.interpretation.model,
       });
-    } catch {
+      track("result_view", {
+        ...routeAnalyticsParams("result", spread),
+        spread_id: spread.id,
+        spread_name: spread.name,
+        card_count: cards.length,
+        source: "fresh_reading",
+      });
+    } catch (error) {
       setResultLoading(false);
+      track("interpret_error", {
+        ...routeAnalyticsParams("result", spread),
+        spread_id: spread.id,
+        step: "network_or_parse",
+        error_message: error instanceof Error ? error.message : "network_error",
+      });
       flash("Could not generate the reading. Please try again.");
     } finally {
       setRevealing(false);
@@ -2609,6 +2916,12 @@ export default function TarotApp({
 
   function startGoogleLogin() {
     setAuthMessage("Opening Google sign-in...");
+    track("login_google_click", {
+      trigger: pendingDraw ? "pending_draw" : pendingSave ? "pending_save" : "manual",
+      pending_draw: pendingDraw,
+      pending_save: pendingSave,
+      has_pending_subscribe: Boolean(window.sessionStorage.getItem(pendingSubscribeKey)),
+    });
     const hasPendingSubscribe = Boolean(window.sessionStorage.getItem(pendingSubscribeKey));
     if (pendingSave) {
       queuePendingSave();
@@ -2633,6 +2946,10 @@ export default function TarotApp({
   async function requestCode() {
     setAuthMessage("");
     setDevCode("");
+    track("login_email_code_request", {
+      email_entered: Boolean(authEmail.trim()),
+      trigger: pendingDraw ? "pending_draw" : pendingSave ? "pending_save" : "manual",
+    });
     const response = await fetch("/api/auth/request-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2640,16 +2957,26 @@ export default function TarotApp({
     });
     const data = (await response.json()) as { error?: string; devCode?: string };
     if (!response.ok) {
+      track("login_email_code_error", {
+        error_code: response.status,
+        error_message: data.error ?? "request_code_failed",
+      });
       setAuthMessage(data.error ?? "Could not send code");
       return;
     }
     setCodeSent(true);
     setDevCode(data.devCode ?? "");
     setAuthMessage("Enter the 6-digit code from your email.");
+    track("login_email_code_sent", {
+      dev_code_present: Boolean(data.devCode),
+    });
   }
 
   async function verifyCode() {
     setAuthMessage("");
+    track("login_email_verify_start", {
+      code_entered: Boolean(authCode.trim()),
+    });
     const response = await fetch("/api/auth/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2657,6 +2984,11 @@ export default function TarotApp({
     });
     const data = (await response.json()) as { error?: string };
     if (!response.ok) {
+      track("login_error", {
+        method: "email",
+        error_code: response.status,
+        error_message: data.error ?? "verify_code_failed",
+      });
       setAuthMessage(data.error ?? "Could not verify code");
       return;
     }
@@ -2695,13 +3027,26 @@ export default function TarotApp({
     });
     setSaving(false);
     if (!response.ok) {
+      track("journal_save_error", {
+        spread_id: payload.spreadId,
+        error_code: response.status,
+      });
       flash("Could not save this reading.");
       return;
     }
+    track("journal_save_success", {
+      spread_id: payload.spreadId,
+      card_count: payload.cards.length,
+    });
     flash("Reading saved to your journal.");
   }
 
   async function saveReading() {
+    track("journal_save_click", {
+      spread_id: spread.id,
+      card_count: cards.length,
+      requires_login: !user,
+    });
     if (!user) {
       queuePendingSave();
       openLogin("save_journal");
@@ -2711,10 +3056,15 @@ export default function TarotApp({
   }
 
   function startNewReading() {
+    track("new_reading_click", {
+      spread_id: spread.id,
+      free_readings_left: freeReadingsLeft,
+    });
     if (!isSubscribed && effectiveFreeUsed >= freeLimit) {
       openPaywall("new_reading");
       return;
     }
+    clearReadingJourney();
     goHome();
   }
 
@@ -2737,6 +3087,7 @@ export default function TarotApp({
       spread_id: reading.spreadId,
       source: "journal",
       card_count: reading.payload.cards.length,
+      reading_id: reading.id,
     });
     window.scrollTo({ top: 0 });
   }
@@ -3054,12 +3405,19 @@ export default function TarotApp({
 	                  : `${freeReadingsLeft} free reading${freeReadingsLeft === 1 ? "" : "s"} left`
 	              }
 	              onQuestionChange={setQuestion}
-	              onPromptPick={setQuestion}
+	              onPromptPick={(value) => {
+	                track("prompt_pick", {
+	                  source: "detail_prompt",
+	                  spread_id: spread.id,
+	                  prompt_length: value.length,
+	                });
+	                setQuestion(value);
+	              }}
 	              onReaderNameChange={setReaderName}
 	              onBirthMonthChange={updateBirthMonth}
 	              onBirthDayChange={setBirthDay}
 	              onBirthYearChange={updateBirthYear}
-	              onBeginDraw={() => void beginDraw()}
+	              onBeginDraw={() => void beginDraw(spread, { source: "detail_ask" })}
 	            />
 	          </div>
 	          <RelatedSpreads spread={spread} onOpenSpread={openSpread} onGoHome={beginAtSpreads} />
@@ -3093,7 +3451,18 @@ export default function TarotApp({
             />
             <div className="prompt-row question-prompts">
               {questionPrompts.map((prompt) => (
-                <button className="prompt-chip" key={prompt} onClick={() => setQuestion(prompt)}>
+                <button
+                  className="prompt-chip"
+                  key={prompt}
+                  onClick={() => {
+                    track("prompt_pick", {
+                      source: "question_step_prompt",
+                      spread_id: spread.id,
+                      prompt_length: prompt.length,
+                    });
+                    setQuestion(prompt);
+                  }}
+                >
                   {prompt}
                 </button>
               ))}
@@ -3161,11 +3530,20 @@ export default function TarotApp({
                     <button
                       className={`draw-card ${card.flipped ? "flipped" : ""}`}
                       onClick={() =>
-                        setCards((current) =>
-                          current.map((item, itemIndex) =>
+                        setCards((current) => {
+                          const target = current[index];
+                          if (target && !target.flipped) {
+                            track("card_reveal", {
+                              card_position_index: index + 1,
+                              position_label: target.posLabel,
+                              spread_id: spread.id,
+                              is_reversed: target.reversed,
+                            });
+                          }
+                          return current.map((item, itemIndex) =>
                             itemIndex === index ? { ...item, flipped: true } : item
-                          )
-                        )
+                          );
+                        })
                       }
                     >
                       <span className="draw-inner">
@@ -3184,9 +3562,13 @@ export default function TarotApp({
                 {!cards.every((card) => card.flipped) && (
                   <button
                     className="secondary-btn"
-                    onClick={() =>
-                      setCards((current) => current.map((card) => ({ ...card, flipped: true })))
-                    }
+                    onClick={() => {
+                      track("card_reveal_all", {
+                        spread_id: spread.id,
+                        remaining_cards: cards.filter((card) => !card.flipped).length,
+                      });
+                      setCards((current) => current.map((card) => ({ ...card, flipped: true })));
+                    }}
                   >
                     Reveal all
                   </button>
@@ -3336,13 +3718,22 @@ export default function TarotApp({
                     <span className="followup-pro">PRO</span>
                   </div>
                   <div className="followup-input-row">
-                    <button className="followup-field" onClick={() => openPaywall("followup")}>
+                    <button
+                      className="followup-field"
+                      onClick={() => {
+                        track("followup_click", { source: "followup_field" });
+                        openPaywall("followup");
+                      }}
+                    >
                       e.g. What should I focus on next?
                     </button>
                     <button
                       className="followup-send"
                       aria-label="Unlock follow-up questions"
-                      onClick={() => openPaywall("followup")}
+                      onClick={() => {
+                        track("followup_click", { source: "followup_send" });
+                        openPaywall("followup");
+                      }}
                     >
                       <svg
                         width="19"
@@ -3402,7 +3793,13 @@ export default function TarotApp({
                     <span>✓ Private journal</span>
                     <span>✓ All spreads unlocked</span>
                   </div>
-                  <button className="white-btn" onClick={() => openPaywall("result")}>
+                  <button
+                    className="white-btn"
+                    onClick={() => {
+                      track("upsell_click", { source: "result_upsell" });
+                      openPaywall("result");
+                    }}
+                  >
                     Go unlimited
                   </button>
                 </section>
@@ -3546,6 +3943,11 @@ export default function TarotApp({
               className="google-close"
               aria-label="Close"
               onClick={() => {
+                track("login_modal_close", {
+                  pending_draw: pendingDraw,
+                  pending_save: pendingSave,
+                  has_pending_subscribe: Boolean(window.sessionStorage.getItem(pendingSubscribeKey)),
+                });
                 setAuthOpen(false);
                 setPendingDraw(false);
                 setPendingSave(false);
