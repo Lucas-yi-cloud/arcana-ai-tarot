@@ -78,11 +78,14 @@ export type ReadingProfile = {
   birthDate?: string;
 };
 
+type QuestionIntent = "when" | "where" | "why" | "what" | "how" | "which" | "yesno" | "open";
+
 const SYSTEM_PROMPT = [
   "You are Arcana AI, a thoughtful tarot reader working with the Rider-Waite-Smith Major Arcana.",
   "Treat tarot as a mirror for reflection, not fixed prediction or fortune-telling.",
   "Write warmly and directly to the seeker in the second person ('you').",
   "Before writing, silently identify the seeker's exact question focus: topic, time horizon, decision point, fear or hope, and what a useful answer must clarify.",
+  "Also silently classify the user's question type: when, where, why, what, how, which path, yes/no, or open reflection.",
   "Use that question focus as the anchor for every paragraph. Reuse concrete nouns, dates, domains, choices, or risks from the question where natural.",
   "Ground every card in its traditional upright or reversed meaning, its named spread position and that position's description, the seeker's exact question when given, and the pattern formed by the surrounding cards.",
   "Do not write generic card meanings. Translate each card into what it says about this specific question in this specific position.",
@@ -95,12 +98,15 @@ const SYSTEM_PROMPT = [
   "The final synthesis is the product's most important answer. It must not sound like a tarot essay, a horoscope, a therapy note, or a recap of the cards.",
   "The final synthesis must be exactly 3 short paragraphs separated by blank lines, using these labels exactly: ANSWER:, WHY:, NEXT MOVE:.",
   "Paragraph 1 must be ANSWER: followed by a direct verdict or position in 8-18 words. For yes/no questions, start with Yes, No, Likely, Not yet, or Unclear. For choice questions, name the better path or say what condition must decide it. For open questions, name the clearest theme or direction.",
+  "For WH questions, answer the WH word directly before adding nuance: when = a concrete time window plus trigger; where = a concrete place, channel, setting, or context; why = the main cause; what = the specific object, option, risk, or next focus; how = the ordered method.",
+  "Do not answer a WHEN question with only 'when you...' or 'as you...'. If no exact date is responsible, give a reading-based relative window such as 'within 2-6 weeks' plus the condition that could move it earlier or later.",
   "Paragraph 2 must be WHY: followed by 1-2 sentences that explain the main reason in plain language tied to the user's actual question. Name the tradeoff, bottleneck, risk, timing issue, or relationship dynamic. Do not explain card meanings.",
   "Paragraph 3 must be NEXT MOVE: followed by 1-2 sentences with one concrete action, test, conversation, boundary, or timing rule. Make it practical enough that the seeker could do it today or before making the decision.",
   "The final synthesis must stay between 60 and 105 words total. Do not explain individual card meanings there; that belongs only in the card interpretations.",
   "In the final synthesis, do not name tarot cards, do not put card names in parentheses, and do not write evidence lists such as '(The Devil)' or '(The Sun reversed)'.",
   "In the final synthesis, avoid spiritual filler and vague comfort phrases such as 'inner voice', 'deepest calling', 'honor your worth', 'trust the universe', 'quiet contemplation', 'align with your purpose', 'embrace optimism', or 'everything happens for a reason'.",
-  "In the final synthesis, be precise and useful: answer the question, state the main condition or risk, and give one next action. If the question lacks enough context, say what must be clarified instead of pretending certainty.",
+  "In the final synthesis, avoid evasive phrasing such as 'it depends', 'may emerge when', 'could happen as you', 'seek clarity', or 'assert your value' unless followed by a concrete time, place, cause, fact, or action.",
+  "In the final synthesis, be precise and useful: answer the question, state the main condition or risk, and give one next action. If the question lacks enough context, say exactly what must be clarified instead of pretending certainty.",
   "Inside JSON string values, represent paragraph breaks as escaped newlines: \\n\\n. Never compress the reading into one long paragraph.",
   "Respond with a single minified JSON object only — no code fences, no commentary outside the JSON.",
 ].join(" ");
@@ -153,6 +159,115 @@ function orientation(card: DrawInput) {
 
 function keywords(card: DrawInput) {
   return card.reversed ? card.rev : card.up;
+}
+
+function inferQuestionIntent(question: string): QuestionIntent {
+  const text = question.trim().toLowerCase();
+  if (!text) return "open";
+  if (/\b(?:when|how soon|how long|by when|what time|which month|what month|timeframe|timeline)\b/.test(text)) {
+    return "when";
+  }
+  if (/\b(?:where|which place|what place|what location|which channel)\b/.test(text)) {
+    return "where";
+  }
+  if (/\bwhy\b/.test(text)) return "why";
+  if (/\bhow\b/.test(text)) return "how";
+  if (/\b(?:which|path a|path b|option a|option b|choose|choice|better option)\b/.test(text)) {
+    return "which";
+  }
+  if (/^\s*(?:what|what's|what is|what are|what should|what will|what do|what can)\b/.test(text)) {
+    return "what";
+  }
+  if (/^\s*(?:should|will|would|can|could|is|are|am|do|does|did|have|has)\b/.test(text)) {
+    return "yesno";
+  }
+  return "open";
+}
+
+function questionPrecisionProtocol(trimmedQuestion: string) {
+  if (!trimmedQuestion) {
+    return [
+      "Question precision protocol:",
+      "- No specific question was provided, so do not invent a precise answer.",
+      "- The synthesis should ask for one concrete question before a deeper reading.",
+    ].join("\n");
+  }
+
+  const intent = inferQuestionIntent(trimmedQuestion);
+  const shared = [
+    "Question precision protocol:",
+    `- Detected question type: ${intent}.`,
+    "- The ANSWER paragraph must directly answer that type in its first sentence, not drift into general advice.",
+    "- Use at most one soft qualifier such as 'likely' or 'not yet', then give the concrete answer unit.",
+    "- Never make an absolute guarantee; frame exactness as the reading's strongest signal.",
+  ];
+
+  if (intent === "when") {
+    return [
+      ...shared,
+      "- WHEN answer format: give a concrete relative or calendar window plus a trigger/condition.",
+      "- Good: 'ANSWER: Watch the next 2-6 weeks; movement depends on one direct follow-up.'",
+      "- Bad: 'ANSWER: Your offer emerges when you seek clarity and assert your value.'",
+      "- If the question is about a job, offer, reply, or interview, use practical hiring language: this week, next 2-4 weeks, after a follow-up, after scope is clarified, before/after the next conversation.",
+    ].join("\n");
+  }
+
+  if (intent === "where") {
+    return [
+      ...shared,
+      "- WHERE answer format: name the most likely place, channel, setting, or context, then the sign that confirms it.",
+      "- Use concrete nouns such as current workplace, referral, recruiter, online channel, private conversation, social circle, home/family setting, or a specific type of room/event when the spread supports it.",
+      "- Do not answer with 'where you feel aligned' or another internal state only.",
+    ].join("\n");
+  }
+
+  if (intent === "why") {
+    return [
+      ...shared,
+      "- WHY answer format: state the main cause first, then the supporting dynamic.",
+      "- Use direct cause language: because, the main reason, the blocker, the pattern, the mismatch, the hidden cost, the missing information.",
+      "- Do not answer with consolation or a lesson before naming the cause.",
+    ].join("\n");
+  }
+
+  if (intent === "what") {
+    return [
+      ...shared,
+      "- WHAT answer format: name the specific thing the user asked for: best move, risk, opportunity, problem, answer, choice, or focus.",
+      "- The answer must include a concrete noun from the user's domain, such as offer, role, conversation, person, boundary, budget, deadline, or next step.",
+      "- Do not answer only with an abstract theme like clarity, growth, harmony, or self-worth.",
+    ].join("\n");
+  }
+
+  if (intent === "how") {
+    return [
+      ...shared,
+      "- HOW answer format: give a short method in order, ideally 2-3 steps.",
+      "- Use action verbs such as ask, compare, delay, confirm, send, set, choose, review, or test.",
+      "- Do not answer with mindset alone.",
+    ].join("\n");
+  }
+
+  if (intent === "which") {
+    return [
+      ...shared,
+      "- WHICH/choice answer format: name the stronger option or the exact deciding condition.",
+      "- If the options are not named, define the deciding test: lower risk, clearer terms, stronger reciprocity, or more concrete evidence.",
+    ].join("\n");
+  }
+
+  if (intent === "yesno") {
+    return [
+      ...shared,
+      "- YES/NO answer format: start with Yes, No, Likely, Not yet, or Unclear, then one concrete condition.",
+      "- Do not answer with a soft maybe unless the answer is genuinely unclear; even then, state what would make it clear.",
+    ].join("\n");
+  }
+
+  return [
+    ...shared,
+    "- OPEN answer format: name the clearest bottleneck, direction, or focus in concrete terms.",
+  ].join("\n");
 }
 
 function questionBindingProtocol(spread: Spread, trimmedQuestion: string) {
@@ -324,6 +439,8 @@ function buildUserPrompt(
     "",
     questionBindingProtocol(spread, trimmed),
     "",
+    questionPrecisionProtocol(trimmed),
+    "",
     finalAnswerContract(spread, trimmed),
     "",
     "Answer quality checklist:",
@@ -332,6 +449,7 @@ function buildUserPrompt(
     "- The synthesis should feel like a decision note or reflection note, not a horoscope, essay, card recap, or inspirational quote.",
     "- The synthesis must not include parenthetical tarot labels, card-name citations, or comma-heavy abstract lists.",
     "- Prefer concrete words tied to the question: timing, cost, effort, boundary, evidence, conversation, risk, offer, pattern, deadline, or next test.",
+    "- For when/where/why/what/how questions, the synthesis ANSWER must contain the corresponding concrete answer unit, not only a personal-development condition.",
     "- Avoid absolute promises, fatalistic predictions, and unsupported certainty.",
     "",
     'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"ANSWER: <direct answer>\\n\\nWHY: <specific reason>\\n\\nNEXT MOVE: <practical next step>"}.',
@@ -407,11 +525,62 @@ const obviousCardReferencePattern = new RegExp(
 const fillerPhrasePattern =
   /\b(?:trust your intuition|inner voice|deepest calling|honou?r your worth|trust the universe|quiet contemplation|align with your purpose|embrace optimism|everything happens for a reason|follow your heart|journey of self-discovery)\b/i;
 
+const evasiveAnswerPattern =
+  /\b(?:it depends|may emerge when|might emerge when|could happen as you|likely to emerge when|proactively seek clarity|assert your (?:unique )?value|seek clarity|honou?r your worth|listen to your inner)\b/i;
+
+const timingAnswerPattern =
+  /\b(?:today|tomorrow|tonight|this\s+(?:week|month|quarter|season|year|weekend)|next\s+(?:week|month|quarter|season|year|few\s+days|few\s+weeks|few\s+months)|within\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a)\s+(?:days?|weeks?|months?|years?)|in\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a)\s+(?:days?|weeks?|months?|years?)|(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*[-–]\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:days?|weeks?|months?|years?)|by\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|early|mid|late)|(?:early|mid|late)\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|spring|summer|fall|autumn|winter)|q[1-4]|january|february|march|april|may|june|july|august|september|october|november|december)\b/i;
+
+const whereAnswerPattern =
+  /\b(?:at|in|inside|through|via|from|with|near|around|within|online|workplace|office|recruiter|referral|network|platform|channel|conversation|event|home|family|friend|team)\b/i;
+
+const whyAnswerPattern =
+  /\b(?:because|due to|main reason|root cause|blocker|blocked by|comes from|caused by|the pattern is|the mismatch is|missing information|hidden cost)\b/i;
+
+const howAnswerPattern =
+  /\b(?:first|then|next|start by|begin by|step|ask|compare|confirm|send|set|choose|review|test|delay|wait|avoid)\b/i;
+
 function wordCount(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function synthesisQualityIssues(text: string) {
+function firstAnswerBody(paragraphs: string[]) {
+  return (paragraphs[0] ?? "").replace(/^ANSWER:\s*/i, "").trim();
+}
+
+function synthesisPrecisionIssues(text: string, question: string) {
+  const intent = inferQuestionIntent(question);
+  if (intent === "open") return [];
+
+  const cleaned = cleanSynthesisText(text);
+  const paragraphs = cleaned.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
+  const answer = firstAnswerBody(paragraphs);
+  const issues: string[] = [];
+
+  if (evasiveAnswerPattern.test(answer)) {
+    issues.push("The ANSWER paragraph is evasive; replace it with a concrete answer to the user's question type.");
+  }
+
+  if (intent === "when" && !timingAnswerPattern.test(answer)) {
+    issues.push("The user asked WHEN, so ANSWER must include a concrete time window such as 'within 2-6 weeks', 'next month', or 'late August', plus a condition.");
+  }
+  if (intent === "where" && !whereAnswerPattern.test(answer)) {
+    issues.push("The user asked WHERE, so ANSWER must name a concrete place, channel, setting, or context.");
+  }
+  if (intent === "why" && !whyAnswerPattern.test(`${answer} ${paragraphs[1] ?? ""}`)) {
+    issues.push("The user asked WHY, so ANSWER/WHY must state the primary cause in direct cause language.");
+  }
+  if (intent === "what" && /\b(?:clarity|growth|harmony|balance|alignment|self-worth)\b/i.test(answer) && !/\b(?:offer|role|choice|risk|problem|move|conversation|deadline|budget|boundary|decision|opportunity|step|person|pattern)\b/i.test(answer)) {
+    issues.push("The user asked WHAT, so ANSWER must name a concrete object, choice, risk, opportunity, or next focus, not only an abstract theme.");
+  }
+  if (intent === "how" && !howAnswerPattern.test(answer)) {
+    issues.push("The user asked HOW, so ANSWER must include an ordered method or practical action verbs.");
+  }
+
+  return issues;
+}
+
+function synthesisQualityIssues(text: string, question = "") {
   const cleaned = cleanSynthesisText(text);
   const paragraphs = cleaned.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
   const issues: string[] = [];
@@ -440,7 +609,7 @@ function synthesisQualityIssues(text: string) {
     issues.push("The synthesis must be concise, roughly 60-105 words.");
   }
 
-  return issues;
+  return [...issues, ...synthesisPrecisionIssues(cleaned, question)];
 }
 
 /** Deterministic Rider-Waite reading used when the LLM is unavailable. */
@@ -485,10 +654,39 @@ export function deterministicInterpretation(
       `WHY: ${opener} The clearest signal is ${positive ? "yes, if practical support is already visible" : "not yet, because a missing condition still matters"}. Treat this as a decision that needs evidence, not reassurance.\n\n` +
       `NEXT MOVE: Name the one fact that would change your answer. If you cannot confirm it, pause or choose the lower-risk step.`;
   } else {
-    synthesis =
-      `ANSWER: Make the next move only after the facts are clearer.\n\n` +
-      `WHY: ${opener} The useful answer is practical: do not decide from pressure alone. This choice needs cleaner information, firmer boundaries, or a more direct conversation before it becomes reliable.\n\n` +
-      "NEXT MOVE: Write down the main risk, the evidence you still need, and the smallest step that tests the situation. Act on that test before making a bigger commitment.";
+    const intent = inferQuestionIntent(trimmedQuestion);
+    const delayed = first?.reversed;
+    if (intent === "when") {
+      synthesis =
+        `ANSWER: Watch the next ${delayed ? "6-10" : "2-6"} weeks; movement needs one concrete follow-up or reply.\n\n` +
+        `WHY: ${opener} The timing looks tied to information becoming explicit, not to waiting passively. A vague process is the main delay.\n\n` +
+        "NEXT MOVE: Send one concise follow-up asking for timeline, scope, and decision criteria. If there is no concrete reply within a week, keep other options active.";
+    } else if (intent === "where") {
+      synthesis =
+        `ANSWER: Look through an existing network, referral, or direct conversation first.\n\n` +
+        `WHY: ${opener} The strongest signal is not a random new place; it is a context where trust or prior contact already exists. A cold route needs more evidence.\n\n` +
+        "NEXT MOVE: List three warm channels you can contact today, then test the strongest one with a clear request.";
+    } else if (intent === "why") {
+      synthesis =
+        `ANSWER: The main reason is missing information and unclear expectations.\n\n` +
+        `WHY: ${opener} The situation is harder to read because an important term, motive, or boundary has not been stated plainly. Guessing fills the gap with anxiety.\n\n` +
+        "NEXT MOVE: Ask one direct question that forces the hidden condition into the open, then decide from the answer rather than the silence.";
+    } else if (intent === "what") {
+      synthesis =
+        `ANSWER: Focus on the option with clear terms, visible effort, and lower hidden cost.\n\n` +
+        `WHY: ${opener} The useful signal is practical: the right object or move should reduce ambiguity, not ask you to supply all the certainty yourself.\n\n` +
+        "NEXT MOVE: Compare the top two options by timeline, cost, responsibility, and risk. Choose the one that gives the clearest next commitment.";
+    } else if (intent === "how") {
+      synthesis =
+        `ANSWER: Move in three steps: clarify the facts, test the response, then commit small.\n\n` +
+        `WHY: ${opener} The situation needs proof before a larger move. Acting from pressure would make the outcome harder to steer.\n\n` +
+        "NEXT MOVE: Ask the key question today, set a short deadline for the reply, and take only the next reversible step.";
+    } else {
+      synthesis =
+        `ANSWER: Make the next move only after the facts are clearer.\n\n` +
+        `WHY: ${opener} The useful answer is practical: do not decide from pressure alone. This choice needs cleaner information, firmer boundaries, or a more direct conversation before it becomes reliable.\n\n` +
+        "NEXT MOVE: Write down the main risk, the evidence you still need, and the smallest step that tests the situation. Act on that test before making a bigger commitment.";
+    }
   }
 
   return { cards: cardOut, synthesis: cleanSynthesisText(synthesis), model: FALLBACK_MODEL };
@@ -556,6 +754,7 @@ async function callAnthropic(env: AppEnv, userPrompt: string): Promise<ProviderR
     body: JSON.stringify({
       model,
       max_tokens: 3000,
+      temperature: 0.45,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
       output_config: {
@@ -591,7 +790,7 @@ async function callGemini(env: AppEnv, userPrompt: string): Promise<ProviderResu
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: GEMINI_SCHEMA,
-          temperature: 0.9,
+          temperature: 0.45,
           maxOutputTokens: 4096,
           // Disable "thinking" so the whole output budget goes to the JSON
           // answer (faster + cheaper for structured extraction).
@@ -609,14 +808,14 @@ async function callGemini(env: AppEnv, userPrompt: string): Promise<ProviderResu
   return { text, model };
 }
 
-function isValidReading(parsed: ParsedReading | null, count: number): boolean {
+function isValidReading(parsed: ParsedReading | null, count: number, question = ""): boolean {
   return (
     !!parsed &&
     Array.isArray(parsed.cards) &&
     parsed.cards.length === count &&
     typeof parsed.synthesis === "string" &&
     parsed.synthesis.trim().length > 0 &&
-    synthesisQualityIssues(parsed.synthesis).length === 0
+    synthesisQualityIssues(parsed.synthesis, question).length === 0
   );
 }
 
@@ -643,10 +842,10 @@ export async function interpretReading(
   let parsed = result ? extractJson(result.text) : null;
 
   // One stricter repair attempt before falling back to deterministic text.
-  if (!isValidReading(parsed, cards.length)) {
+  if (!isValidReading(parsed, cards.length, question)) {
     const synthesisIssues =
       parsed && typeof parsed.synthesis === "string"
-        ? synthesisQualityIssues(parsed.synthesis)
+        ? synthesisQualityIssues(parsed.synthesis, question)
         : ["The response was missing or not valid JSON."];
     const repairPrompt = [
       userPrompt,
@@ -657,17 +856,18 @@ export async function interpretReading(
       "Return the same reading again as a single valid JSON object only — no code fences, no commentary outside the JSON —",
       `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"ANSWER: <direct answer>\\n\\nWHY: <specific reason>\\n\\nNEXT MOVE: <practical next step>"} with exactly ${cards.length} card entries in position order.`,
       "The synthesis must be concise, question-specific, and must not mention tarot card names.",
+      "For when/where/why/what/how questions, the synthesis ANSWER must directly answer that question type with a concrete time, place, cause, object, or method.",
       "Every interpretation and synthesis string must contain paragraph breaks using \\n\\n.",
     ].join("\n");
     const retry = await call(repairPrompt);
     const retryParsed = retry ? extractJson(retry.text) : null;
-    if (isValidReading(retryParsed, cards.length)) {
+    if (isValidReading(retryParsed, cards.length, question)) {
       result = retry;
       parsed = retryParsed;
     }
   }
 
-  if (!result || !parsed || !isValidReading(parsed, cards.length)) {
+  if (!result || !parsed || !isValidReading(parsed, cards.length, question)) {
     return deterministicInterpretation(spread, question, cards, profile);
   }
 
