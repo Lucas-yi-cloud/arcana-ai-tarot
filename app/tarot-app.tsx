@@ -701,6 +701,17 @@ function renderReadingInline(text: string): ReactNode[] {
     ];
   }
 
+  const labeledAnswer = normalized.match(/^(ANSWER|WHY|NEXT MOVE|WATCH OUT):\s*(.+)$/iu);
+  if (labeledAnswer) {
+    const label = labeledAnswer[1].toUpperCase();
+    return [
+      <strong className="reading-highlight" key={`${label}-label`}>
+        {`${label}:`}
+      </strong>,
+      <span key={`${label}-copy`}>{labeledAnswer[2].trim()}</span>,
+    ];
+  }
+
   const parts = normalized.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
   return parts.map((part, index) => {
     if (part.startsWith("**") && part.endsWith("**")) {

@@ -2269,6 +2269,11 @@ button {
   text-transform: uppercase;
 }
 
+.reading-synthesis .reading-highlight + span {
+  display: block;
+  margin-top: 6px;
+}
+
 .followup-card {
   margin-top: 18px;
   border: 1px solid #e7e0f7;

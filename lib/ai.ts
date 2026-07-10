@@ -92,12 +92,15 @@ const SYSTEM_PROMPT = [
   "Do not give medical, legal, financial, or mental-health directives. For career and money readings give reflective guidance and gentle next steps, not professional advice; for relationship readings describe dynamics and choices, not guaranteed feelings or outcomes.",
   "For yes/no readings, give a clear but non-absolute verdict: yes, no, likely, not yet, or unclear — plus the condition that changes or supports that answer.",
   "Each card interpretation must be 2 short paragraphs separated by a blank line. The first paragraph should explain the card through its position; the second should connect that position directly to the seeker's question with one reflective cue.",
-  "The final synthesis is not a card-by-card explanation. It must function as a concise answer card: a clear takeaway, a direct answer to the question, and one practical next step.",
-  "The final synthesis must be exactly 3 short paragraphs separated by blank lines. Paragraph 1 must be a single highlighted takeaway line in the form KEY TAKEAWAY: <8-16 words>. Paragraph 2 must directly answer the exact question in 1-2 sentences. Paragraph 3 must give practical, grounded advice in 1-2 sentences.",
-  "The final synthesis must stay between 75 and 115 words total. Do not explain individual card meanings there; that belongs only in the card interpretations.",
+  "The final synthesis is the product's most important answer. It must not sound like a tarot essay, a horoscope, a therapy note, or a recap of the cards.",
+  "The final synthesis must be exactly 3 short paragraphs separated by blank lines, using these labels exactly: ANSWER:, WHY:, NEXT MOVE:.",
+  "Paragraph 1 must be ANSWER: followed by a direct verdict or position in 8-18 words. For yes/no questions, start with Yes, No, Likely, Not yet, or Unclear. For choice questions, name the better path or say what condition must decide it. For open questions, name the clearest theme or direction.",
+  "Paragraph 2 must be WHY: followed by 1-2 sentences that explain the main reason in plain language tied to the user's actual question. Name the tradeoff, bottleneck, risk, timing issue, or relationship dynamic. Do not explain card meanings.",
+  "Paragraph 3 must be NEXT MOVE: followed by 1-2 sentences with one concrete action, test, conversation, boundary, or timing rule. Make it practical enough that the seeker could do it today or before making the decision.",
+  "The final synthesis must stay between 60 and 105 words total. Do not explain individual card meanings there; that belongs only in the card interpretations.",
   "In the final synthesis, do not name tarot cards, do not put card names in parentheses, and do not write evidence lists such as '(The Devil)' or '(The Sun reversed)'.",
-  "In the final synthesis, avoid spiritual filler and vague comfort phrases such as 'inner voice', 'deepest calling', 'honor your worth', 'trust the universe', 'quiet contemplation', or 'align with your purpose' unless the seeker explicitly asked a spiritual question.",
-  "In the final synthesis, be precise: name the likely answer, the main tradeoff or risk, and one next action the seeker can actually take.",
+  "In the final synthesis, avoid spiritual filler and vague comfort phrases such as 'inner voice', 'deepest calling', 'honor your worth', 'trust the universe', 'quiet contemplation', 'align with your purpose', 'embrace optimism', or 'everything happens for a reason'.",
+  "In the final synthesis, be precise and useful: answer the question, state the main condition or risk, and give one next action. If the question lacks enough context, say what must be clarified instead of pretending certainty.",
   "Inside JSON string values, represent paragraph breaks as escaped newlines: \\n\\n. Never compress the reading into one long paragraph.",
   "Respond with a single minified JSON object only — no code fences, no commentary outside the JSON.",
 ].join(" ");
@@ -164,11 +167,11 @@ function questionBindingProtocol(spread: Spread, trimmedQuestion: string) {
   const yesNoRule =
     spread.id === "yesno"
       ? [
-          "- Because this is a Yes / No spread, the synthesis takeaway must begin with a verdict for the exact question: 'KEY TAKEAWAY: [Yes/No/Likely/Not yet/Unclear] — [condition].'",
+          "- Because this is a Yes / No spread, the synthesis ANSWER paragraph must begin with a verdict for the exact question: 'ANSWER: [Yes/No/Likely/Not yet/Unclear] — [condition].'",
           "- Keep the condition plain and practical. Do not turn the answer into a broad horoscope or a card-meaning lesson.",
         ]
       : [
-          "- The synthesis takeaway must answer the exact question in plain language before widening into nuance.",
+          "- The synthesis ANSWER paragraph must answer the exact question in plain language before widening into nuance.",
           "- In the synthesis, do not mention card names at all. Convert the spread into a direct conclusion about the question.",
         ];
 
@@ -197,6 +200,96 @@ function profileLines(profile?: ReadingProfile) {
     birthDate
       ? `- The seeker selected date of birth "${birthDate}". Use it only as a quiet personal anchor for tone; do not make astrology, numerology, medical, or fate claims from it.`
       : "- The seeker did not provide a date of birth.",
+  ].join("\n");
+}
+
+function finalAnswerContract(spread: Spread, trimmedQuestion: string) {
+  const shared = [
+    "Final synthesis contract:",
+    "- Use exactly three paragraphs and these exact labels: ANSWER:, WHY:, NEXT MOVE:.",
+    "- Do not mention card names, positions, upright/reversed status, or tarot terminology in the synthesis.",
+    "- Do not write a moral lesson. Write the useful answer the user came for.",
+    "- If the question is underspecified, say the exact missing condition instead of becoming vague.",
+  ];
+
+  if (!trimmedQuestion) {
+    return [
+      ...shared,
+      "- No specific question was provided. ANSWER should name the most actionable focus of the reading, not pretend to answer a hidden question.",
+      "- WHY should describe the pattern without inventing private facts.",
+      "- NEXT MOVE should ask the user to choose one concrete question before doing a deeper reading.",
+    ].join("\n");
+  }
+
+  if (spread.id === "yesno") {
+    return [
+      ...shared,
+      "- This is a Yes / No reading. ANSWER must start with exactly one of: Yes, No, Likely, Not yet, Unclear.",
+      "- The answer cannot be pure reassurance. It must include the condition that makes the verdict stronger or weaker.",
+      "- WHY must explain the main practical reason, not summarize the single card.",
+      "- NEXT MOVE must tell the user what to verify, ask, wait for, or avoid before acting.",
+    ].join("\n");
+  }
+
+  if (spread.id === "decision-crossroads") {
+    return [
+      ...shared,
+      "- This is a choice reading. ANSWER must name which path currently looks stronger, or state the deciding condition if the paths are too close.",
+      "- WHY must compare the real tradeoff between the options, not list abstract pros and cons.",
+      "- NEXT MOVE must give a decision test: one question to ask, fact to confirm, or deadline to set.",
+    ].join("\n");
+  }
+
+  if (spread.id === "love-connection" || spread.id === "relationship-mirror" || spread.id === "ex-closure") {
+    return [
+      ...shared,
+      "- This is a relationship reading. ANSWER must name the current relational pattern or likely direction without claiming to know the other person's private thoughts.",
+      "- WHY must connect to behavior, communication, availability, boundaries, or mismatch rather than romantic destiny.",
+      "- NEXT MOVE must suggest a specific conversation, boundary, pacing choice, or closure action.",
+    ].join("\n");
+  }
+
+  if (spread.id === "career-path" || spread.id === "interview-offer") {
+    return [
+      ...shared,
+      "- This is a career reading. ANSWER must clarify the work decision, role fit, opportunity quality, or next professional move.",
+      "- WHY must mention concrete work factors such as preparation, leverage, communication, scope, timing, or fit.",
+      "- NEXT MOVE must be a practical career action, not a motivational sentence.",
+    ].join("\n");
+  }
+
+  if (spread.id === "money-flow") {
+    return [
+      ...shared,
+      "- This is a money reading. ANSWER must clarify the financial behavior, pressure point, or decision signal without giving professional financial advice.",
+      "- WHY must name the money pattern in plain terms: income, spending, risk, delay, hidden cost, or opportunity.",
+      "- NEXT MOVE must be a low-risk practical check such as reviewing a number, delaying a commitment, setting a limit, or asking for terms.",
+    ].join("\n");
+  }
+
+  if (spread.id === "mind-body-spirit") {
+    return [
+      ...shared,
+      "- This is a wellbeing reflection. ANSWER must name what appears out of balance without diagnosing health or mental health conditions.",
+      "- WHY must stay with workload, pace, tension, rest, meaning, or support.",
+      "- NEXT MOVE must be a gentle self-care or support action, and should suggest professional help only when the user's question indicates risk or distress.",
+    ].join("\n");
+  }
+
+  if (spread.id === "year-ahead" || spread.id === "week-ahead") {
+    return [
+      ...shared,
+      "- This is a time-period reading. ANSWER must name the strongest planning theme for the period, not predict fixed events.",
+      "- WHY must identify the momentum, risk, or recurring pattern that matters most.",
+      "- NEXT MOVE must suggest how to plan, review, or track the period.",
+    ].join("\n");
+  }
+
+  return [
+    ...shared,
+    "- ANSWER must state the clearest direction or bottleneck for the exact question.",
+    "- WHY must explain the main tradeoff or pressure point in ordinary language.",
+    "- NEXT MOVE must give one concrete action or test, not a broad affirmation.",
   ].join("\n");
 }
 
@@ -231,6 +324,8 @@ function buildUserPrompt(
     "",
     questionBindingProtocol(spread, trimmed),
     "",
+    finalAnswerContract(spread, trimmed),
+    "",
     "Answer quality checklist:",
     "- The card interpretations may explain card meanings through positions; the synthesis must not repeat those meanings.",
     "- The synthesis must answer the seeker's actual question first, then name what remains conditional and what the seeker can do next.",
@@ -239,7 +334,7 @@ function buildUserPrompt(
     "- Prefer concrete words tied to the question: timing, cost, effort, boundary, evidence, conversation, risk, offer, pattern, deadline, or next test.",
     "- Avoid absolute promises, fatalistic predictions, and unsupported certainty.",
     "",
-    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"KEY TAKEAWAY: <short answer>\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"}.',
+    'Return JSON shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"ANSWER: <direct answer>\\n\\nWHY: <specific reason>\\n\\nNEXT MOVE: <practical next step>"}.',
     "There must be exactly one cards entry per drawn card, in the same order.",
     "Every interpretation and synthesis string must contain visible paragraph breaks using \\n\\n.",
   ].join("\n");
@@ -292,6 +387,7 @@ const parentheticalCardLabelPattern = new RegExp(
 function cleanSynthesisText(text: string) {
   return normalizeParagraphBreaks(text)
     .replace(/\*\*(\s*KEY TAKEAWAY:[^*\n]+?)\*\*/gi, "$1")
+    .replace(/\*\*(\s*(?:ANSWER|WHY|NEXT MOVE):[^*\n]+?)\*\*/gi, "$1")
     .replace(/^\*\*(.+?)\*\*$/gm, "$1")
     .replace(/\*\*/g, "")
     .replace(parentheticalCardLabelPattern, "")
@@ -301,6 +397,50 @@ function cleanSynthesisText(text: string) {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+const obviousCardReferencePattern = new RegExp(
+  `\\b(?:${CARD_LABELS.filter((label) => label.startsWith("The ")).map(escapeRegExp).join("|")})(?:\\s+(?:upright|reversed))?\\b`,
+  "i"
+);
+
+const fillerPhrasePattern =
+  /\b(?:trust your intuition|inner voice|deepest calling|honou?r your worth|trust the universe|quiet contemplation|align with your purpose|embrace optimism|everything happens for a reason|follow your heart|journey of self-discovery)\b/i;
+
+function wordCount(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function synthesisQualityIssues(text: string) {
+  const cleaned = cleanSynthesisText(text);
+  const paragraphs = cleaned.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
+  const issues: string[] = [];
+
+  if (paragraphs.length !== 3) {
+    issues.push("The synthesis must have exactly three paragraphs.");
+  }
+  if (!/^ANSWER:\s+\S/i.test(paragraphs[0] ?? "")) {
+    issues.push("Paragraph 1 must start with ANSWER:.");
+  }
+  if (!/^WHY:\s+\S/i.test(paragraphs[1] ?? "")) {
+    issues.push("Paragraph 2 must start with WHY:.");
+  }
+  if (!/^NEXT MOVE:\s+\S/i.test(paragraphs[2] ?? "")) {
+    issues.push("Paragraph 3 must start with NEXT MOVE:.");
+  }
+  parentheticalCardLabelPattern.lastIndex = 0;
+  if (parentheticalCardLabelPattern.test(cleaned) || obviousCardReferencePattern.test(cleaned)) {
+    issues.push("The synthesis must not mention tarot card names or card-name citations.");
+  }
+  if (fillerPhrasePattern.test(cleaned)) {
+    issues.push("The synthesis contains spiritual filler instead of a concrete answer.");
+  }
+  const words = wordCount(cleaned);
+  if (words < 45 || words > 120) {
+    issues.push("The synthesis must be concise, roughly 60-105 words.");
+  }
+
+  return issues;
 }
 
 /** Deterministic Rider-Waite reading used when the LLM is unavailable. */
@@ -341,14 +481,14 @@ export function deterministicInterpretation(
     const positive = !first.reversed && ["sun", "star", "wheel", "heart"].includes(first.glyph);
     const verdict = positive ? "Likely" : "Not yet";
     synthesis =
-      `KEY TAKEAWAY: ${verdict} — verify the condition before you commit.\n\n` +
-      `${opener} The clearest answer is ${positive ? "yes, if the practical support is already visible" : "not yet, because the missing condition still matters"}. Treat this as a decision that needs evidence, not reassurance.\n\n` +
-      `Before you act, name the one fact that would change your answer. If you cannot confirm it, pause or choose the lower-risk step.`;
+      `ANSWER: ${verdict} — verify the condition before you commit.\n\n` +
+      `WHY: ${opener} The clearest signal is ${positive ? "yes, if practical support is already visible" : "not yet, because a missing condition still matters"}. Treat this as a decision that needs evidence, not reassurance.\n\n` +
+      `NEXT MOVE: Name the one fact that would change your answer. If you cannot confirm it, pause or choose the lower-risk step.`;
   } else {
     synthesis =
-      `KEY TAKEAWAY: Make the next move only after the facts are clearer.\n\n` +
-      `${opener} The useful answer is practical: do not decide from pressure alone. The spread points to a choice that needs cleaner information, firmer boundaries, or a more direct conversation before it becomes reliable.\n\n` +
-      "Write down the main risk, the evidence you still need, and the smallest step that tests the situation. Act on that test before making a bigger commitment.";
+      `ANSWER: Make the next move only after the facts are clearer.\n\n` +
+      `WHY: ${opener} The useful answer is practical: do not decide from pressure alone. This choice needs cleaner information, firmer boundaries, or a more direct conversation before it becomes reliable.\n\n` +
+      "NEXT MOVE: Write down the main risk, the evidence you still need, and the smallest step that tests the situation. Act on that test before making a bigger commitment.";
   }
 
   return { cards: cardOut, synthesis: cleanSynthesisText(synthesis), model: FALLBACK_MODEL };
@@ -475,7 +615,8 @@ function isValidReading(parsed: ParsedReading | null, count: number): boolean {
     Array.isArray(parsed.cards) &&
     parsed.cards.length === count &&
     typeof parsed.synthesis === "string" &&
-    parsed.synthesis.trim().length > 0
+    parsed.synthesis.trim().length > 0 &&
+    synthesisQualityIssues(parsed.synthesis).length === 0
   );
 }
 
@@ -503,11 +644,19 @@ export async function interpretReading(
 
   // One stricter repair attempt before falling back to deterministic text.
   if (!isValidReading(parsed, cards.length)) {
+    const synthesisIssues =
+      parsed && typeof parsed.synthesis === "string"
+        ? synthesisQualityIssues(parsed.synthesis)
+        : ["The response was missing or not valid JSON."];
     const repairPrompt = [
       userPrompt,
       "",
-      "The previous response was missing or not valid JSON. Return the same reading again as a single valid JSON object only — no code fences, no commentary outside the JSON —",
-      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"KEY TAKEAWAY: <short answer>\\n\\n<direct answer paragraph>\\n\\n<practical advice paragraph>"} with exactly ${cards.length} card entries in position order.`,
+      "The previous response failed the answer-quality check:",
+      ...synthesisIssues.map((issue) => `- ${issue}`),
+      "",
+      "Return the same reading again as a single valid JSON object only — no code fences, no commentary outside the JSON —",
+      `shaped exactly like {"cards":[{"position":"<position label>","interpretation":"<paragraph 1>\\n\\n<paragraph 2>"}],"synthesis":"ANSWER: <direct answer>\\n\\nWHY: <specific reason>\\n\\nNEXT MOVE: <practical next step>"} with exactly ${cards.length} card entries in position order.`,
+      "The synthesis must be concise, question-specific, and must not mention tarot card names.",
       "Every interpretation and synthesis string must contain paragraph breaks using \\n\\n.",
     ].join("\n");
     const retry = await call(repairPrompt);
