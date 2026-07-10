@@ -54,6 +54,8 @@ type TrackEvent =
   | "interpret_success"
   | "interpret_error"
   | "result_view"
+  | "share_open"
+  | "share_click"
   | "followup_click"
   | "upsell_click"
   | "new_reading_click"
@@ -1856,6 +1858,158 @@ function ContactPage({ onBack }: { onBack: () => void }) {
   );
 }
 
+type ShareChannel = "x" | "facebook" | "whatsapp" | "telegram" | "reddit" | "native" | "copy_link";
+
+const shareChannels: Array<{
+  id: Exclude<ShareChannel, "native" | "copy_link">;
+  label: string;
+  className: string;
+  icon: ReactNode;
+}> = [
+  {
+    id: "x",
+    label: "X",
+    className: "x",
+    icon: <span aria-hidden="true">X</span>,
+  },
+  {
+    id: "facebook",
+    label: "Facebook",
+    className: "facebook",
+    icon: <span aria-hidden="true">f</span>,
+  },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    className: "whatsapp",
+    icon: (
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5.5 19.2 6.7 15A7 7 0 1 1 9 17.2l-3.5 2z" />
+        <path d="M9.4 8.8c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .5.4l.6 1.4c.1.2.1.4 0 .6l-.5.6c.5.9 1.2 1.6 2.2 2.1l.7-.5c.2-.1.4-.1.6 0l1.3.6c.3.1.4.3.4.6v.4c0 .4-.2.6-.5.8-.4.3-1 .5-1.6.4-2.8-.4-5.5-2.8-6-5.7-.1-.5.1-1 .4-1.4z" />
+      </svg>
+    ),
+  },
+  {
+    id: "telegram",
+    label: "Telegram",
+    className: "telegram",
+    icon: (
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 4 3.5 11.3c-.8.3-.8 1.4.1 1.7l4.4 1.3 1.7 5.1c.3.8 1.3.9 1.8.2l2.4-3.5 4.3 3.1c.7.5 1.6.1 1.8-.8L22 5c.1-.7-.4-1.2-1-1z" />
+        <path d="m8 14.3 8.8-6.1" />
+      </svg>
+    ),
+  },
+  {
+    id: "reddit",
+    label: "Reddit",
+    className: "reddit",
+    icon: (
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="8.5" cy="13.5" r="1" fill="currentColor" stroke="none" />
+        <circle cx="15.5" cy="13.5" r="1" fill="currentColor" stroke="none" />
+        <path d="M8.5 16.2c1.8 1.2 5.2 1.2 7 0" />
+        <path d="M5.5 11.8a8.7 8.7 0 0 1 13 0" />
+        <circle cx="4" cy="12" r="2" />
+        <circle cx="20" cy="12" r="2" />
+        <path d="M13.5 8.1 15 4l3.2.7" />
+      </svg>
+    ),
+  },
+];
+
+function ShareIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="m8.6 10.8 6.8-4.1" />
+      <path d="m8.6 13.2 6.8 4.1" />
+    </svg>
+  );
+}
+
+function ShareSheet({
+  open,
+  shareUrl,
+  onClose,
+  onShare,
+  onCopy,
+  onNative,
+}: {
+  open: boolean;
+  shareUrl: string;
+  onClose: () => void;
+  onShare: (channel: Exclude<ShareChannel, "native" | "copy_link">) => void;
+  onCopy: () => void;
+  onNative: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="share-overlay" role="presentation" onClick={onClose}>
+      <section
+        className="share-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-sheet-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="share-sheet-handle" aria-hidden="true" />
+        <button className="share-close" type="button" aria-label="Close share sheet" onClick={onClose}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+        <div className="share-sheet-head">
+          <span className="share-head-icon">
+            <ShareIcon size={24} />
+          </span>
+          <h2 className="serif" id="share-sheet-title">
+            Share your reading
+          </h2>
+          <p>Send this reading to a friend or post it anywhere.</p>
+        </div>
+        <div className="share-channel-grid" aria-label="Share channels">
+          {shareChannels.map((channel) => (
+            <button
+              className="share-channel"
+              type="button"
+              key={channel.id}
+              onClick={() => onShare(channel.id)}
+            >
+              <span className={`share-channel-icon ${channel.className}`}>{channel.icon}</span>
+              <span>{channel.label}</span>
+            </button>
+          ))}
+          <button className="share-channel" type="button" onClick={onNative}>
+            <span className="share-channel-icon more">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 16V4" />
+                <path d="m7 9 5-5 5 5" />
+                <path d="M20 16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3" />
+              </svg>
+            </span>
+            <span>More</span>
+          </button>
+        </div>
+        <div className="share-copy-row">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
+            <path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1" />
+          </svg>
+          <span>{shareUrl}</span>
+          <button type="button" onClick={onCopy}>
+            Copy
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function TarotApp({
   initialRoute = "home",
   initialSpreadId = spreads[0].id,
@@ -1882,6 +2036,7 @@ export default function TarotApp({
   const [authMessage, setAuthMessage] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan>("quarter");
   const [paywallSrc, setPaywallSrc] = useState<PaywallSource>("nav");
   const [pendingDraw, setPendingDraw] = useState(false);
@@ -3080,6 +3235,84 @@ export default function TarotApp({
     await persistReading();
   }
 
+  function shareUrlForCurrentReading() {
+    return `${siteBaseUrl}/spread/${spread?.id || "reading"}`;
+  }
+
+  function shareTextForCurrentReading() {
+    const trimmedQuestion = question.trim();
+    return `${trimmedQuestion ? `“${trimmedQuestion}” — ` : ""}I just drew ${
+      spread?.name || "a tarot spread"
+    } on Arcana AI. Pull your own cards free:`;
+  }
+
+  function shareIntentUrl(channel: Exclude<ShareChannel, "native" | "copy_link">) {
+    const url = encodeURIComponent(shareUrlForCurrentReading());
+    const text = encodeURIComponent(shareTextForCurrentReading());
+    const title = encodeURIComponent("My Arcana AI tarot reading");
+
+    if (channel === "x") return `https://twitter.com/intent/tweet?text=${text}&url=${url}`;
+    if (channel === "facebook") return `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+    if (channel === "whatsapp") return `https://wa.me/?text=${text}%20${url}`;
+    if (channel === "telegram") return `https://t.me/share/url?url=${url}&text=${text}`;
+    return `https://www.reddit.com/submit?url=${url}&title=${title}`;
+  }
+
+  function openShareSheet() {
+    setShowShare(true);
+    setProfileOpen(false);
+    track("share_open", { spread_id: spread.id });
+  }
+
+  function shareTo(channel: Exclude<ShareChannel, "native" | "copy_link">) {
+    track("share_click", { channel, spread_id: spread.id });
+    window.open(shareIntentUrl(channel), "_blank", "noopener,noreferrer,width=600,height=560");
+  }
+
+  function writeShareLinkToClipboard() {
+    const link = shareUrlForCurrentReading();
+    const done = () => flash("Link copied to clipboard.");
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(link).then(done, done);
+      return;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = link;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand("copy");
+    } finally {
+      document.body.removeChild(textarea);
+      done();
+    }
+  }
+
+  function copyShareLink() {
+    track("share_click", { channel: "copy_link", spread_id: spread.id });
+    writeShareLinkToClipboard();
+  }
+
+  function nativeShare() {
+    track("share_click", { channel: "native", spread_id: spread.id });
+    if (navigator.share) {
+      void navigator
+        .share({
+          title: "My Arcana AI tarot reading",
+          text: shareTextForCurrentReading(),
+          url: shareUrlForCurrentReading(),
+        })
+        .catch(() => undefined);
+      return;
+    }
+
+    writeShareLinkToClipboard();
+  }
+
   function startNewReading() {
     track("new_reading_click", {
       spread_id: spread.id,
@@ -3827,7 +4060,11 @@ export default function TarotApp({
               )}
 
               <div className="result-actions">
-                <button className="result-action-btn" disabled={saving} onClick={() => void saveReading()}>
+                <button className="result-action-btn share-primary" type="button" onClick={openShareSheet}>
+                  <ShareIcon size={18} />
+                  Share reading
+                </button>
+                <button className="result-action-btn" type="button" disabled={saving} onClick={() => void saveReading()}>
                   <svg
                     width="18"
                     height="18"
@@ -3841,9 +4078,16 @@ export default function TarotApp({
                   >
                     <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z" />
                   </svg>
-                  {saving ? "Saving..." : "Save to journal"}
+                  {saving ? (
+                    "Saving..."
+                  ) : (
+                    <>
+                      <span className="result-save-label-full">Save to journal</span>
+                      <span className="result-save-label-short">Save</span>
+                    </>
+                  )}
                 </button>
-                <button className="result-action-btn" onClick={startNewReading}>
+                <button className="result-action-btn" type="button" onClick={startNewReading}>
                   New reading
                 </button>
               </div>
@@ -3889,7 +4133,7 @@ export default function TarotApp({
                 : "Sign in to view your journal"}
             </span>
           </div>
-          {user && (
+          {user && history.length > 0 && (
             <section className="account-summary">
               <div>
                 <span className={`status-pill ${user.membership.tier}`}>
@@ -3917,18 +4161,67 @@ export default function TarotApp({
             </section>
           )}
           {user && history.length === 0 && (
-            <section className="auth-panel">
-              <h2 className="serif" style={{ fontSize: 34, margin: 0 }}>
-                No saved readings yet
-              </h2>
-              <p className="message">Browse spreads and save a result to see it here.</p>
-              <a
-                className="primary-btn"
-                href="/#spreads"
-                onClick={(event) => handleClientLink(event, beginAtSpreads)}
-              >
-                Browse spreads
-              </a>
+            <section className="journal-empty-card">
+              <div className="journal-empty-main">
+                <span className="journal-empty-icon" aria-hidden="true">
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.8L6 20V5a1 1 0 0 1 1-1z" />
+                    <path d="M9 8h6" />
+                    <path d="M9 11h4" />
+                  </svg>
+                </span>
+                <h2 className="serif">No saved readings yet</h2>
+                <p>
+                  Draw a spread and save the result — every reading you keep collects here
+                  in your private journal.
+                </p>
+                <a
+                  className="journal-empty-cta"
+                  href="/#spreads"
+                  onClick={(event) => handleClientLink(event, beginAtSpreads)}
+                >
+                  Browse spreads
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="m13 6 6 6-6 6" />
+                  </svg>
+                </a>
+              </div>
+              {!user.subscribed && (
+                <div className="journal-plan-footer">
+                  <span className="journal-free-pill">FREE</span>
+                  <div>
+                    <strong>Free plan</strong>
+                    <span>
+                      {freeReadingsLeft > 0
+                        ? `${freeReadingsLeft} free reading${freeReadingsLeft === 1 ? "" : "s"} left`
+                        : "No free readings left"}
+                    </span>
+                  </div>
+                  <button type="button" onClick={() => openPaywall("nav")}>
+                    Upgrade
+                  </button>
+                </div>
+              )}
             </section>
           )}
           {user && history.length > 0 && (
@@ -4030,6 +4323,15 @@ export default function TarotApp({
 	          <span>Account</span>
 	        </button>
 	      </nav>
+
+      <ShareSheet
+        open={showShare}
+        shareUrl={shareUrlForCurrentReading()}
+        onClose={() => setShowShare(false)}
+        onShare={shareTo}
+        onCopy={copyShareLink}
+        onNative={nativeShare}
+      />
 
       {authOpen && (
         <div className="modal-backdrop">

@@ -2360,9 +2360,9 @@ button {
 }
 
 .result-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-top: 26px;
 }
 
@@ -2373,6 +2373,8 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  flex: 1 1 150px;
+  min-width: 150px;
   min-height: 48px;
   border: 1px solid #dddce0;
   border-radius: 14px;
@@ -2387,9 +2389,196 @@ button {
   color: var(--purple);
 }
 
+.result-action-btn.share-primary {
+  border-color: #6442c0;
+  background: #6442c0;
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(100, 66, 192, 0.18);
+}
+
+.result-action-btn.share-primary svg {
+  color: currentColor;
+}
+
 .result-action-btn:hover {
   border-color: #cdbff0;
   background: #faf8ff;
+}
+
+.result-action-btn.share-primary:hover {
+  border-color: #5536a9;
+  background: #5536a9;
+}
+
+.result-save-label-short {
+  display: none;
+}
+
+.share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(22, 13, 38, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.share-sheet {
+  position: relative;
+  width: min(420px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 26px 70px rgba(22, 13, 38, 0.28);
+  padding: 30px 24px 24px;
+}
+
+.share-sheet-handle {
+  display: none;
+}
+
+.share-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(29, 28, 31, 0.08);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.share-sheet-head {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 8px 28px 0;
+  text-align: center;
+}
+
+.share-head-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #6442c0;
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(100, 66, 192, 0.22);
+}
+
+.share-sheet-head h2 {
+  margin: 0;
+  color: #211a35;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.08;
+}
+
+.share-sheet-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.share-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.share-channel {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(29, 28, 31, 0.08);
+  border-radius: 16px;
+  background: #faf9fd;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 13px 8px 12px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.share-channel:hover {
+  border-color: rgba(100, 66, 192, 0.2);
+  background: #f6f2ff;
+}
+
+.share-channel-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #23193c;
+  color: #fff;
+  font-weight: 800;
+}
+
+.share-channel-icon.facebook {
+  background: #1877f2;
+}
+
+.share-channel-icon.whatsapp {
+  background: #25d366;
+}
+
+.share-channel-icon.telegram {
+  background: #2aabee;
+}
+
+.share-channel-icon.reddit {
+  background: #ff4500;
+}
+
+.share-channel-icon.more {
+  background: #6442c0;
+}
+
+.share-copy-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid rgba(29, 28, 31, 0.08);
+  border-radius: 15px;
+  background: #fbfaf8;
+  padding: 10px 10px 10px 13px;
+  color: var(--muted);
+}
+
+.share-copy-row span {
+  min-width: 0;
+  overflow: hidden;
+  color: #5d5865;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-copy-row button {
+  border: 0;
+  border-radius: 11px;
+  background: #211936;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 13px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 750;
 }
 
 .result-upsell {
@@ -2606,6 +2795,119 @@ button {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
+}
+
+.journal-empty-card {
+  overflow: hidden;
+  max-width: 760px;
+  margin: 0 auto;
+  border: 1px solid rgba(29, 28, 31, 0.08);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 18px 46px rgba(31, 23, 54, 0.07);
+}
+
+.journal-empty-main {
+  display: grid;
+  justify-items: center;
+  padding: 62px 34px 44px;
+  text-align: center;
+}
+
+.journal-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 22px;
+  border-radius: 50%;
+  background: #f1ebff;
+  color: #6442c0;
+}
+
+.journal-empty-main h2 {
+  margin: 0 0 12px;
+  color: #211a35;
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.08;
+}
+
+.journal-empty-main p {
+  max-width: 470px;
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.journal-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  border-radius: 999px;
+  background: #6442c0;
+  color: #fff;
+  padding: 0 22px;
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+  box-shadow: 0 12px 24px rgba(100, 66, 192, 0.18);
+}
+
+.journal-plan-footer {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  border-top: 1px solid rgba(29, 28, 31, 0.08);
+  background: #fbfaf6;
+  padding: 18px 22px;
+}
+
+.journal-free-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  border-radius: 8px;
+  background: #fff5c9;
+  color: #9c7800;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.journal-plan-footer strong,
+.journal-plan-footer span:not(.journal-free-pill) {
+  display: block;
+}
+
+.journal-plan-footer strong {
+  color: #211a35;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.journal-plan-footer span:not(.journal-free-pill) {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.journal-plan-footer button {
+  border: 0;
+  border-radius: 999px;
+  background: #211936;
+  color: #fff;
+  cursor: pointer;
+  padding: 11px 18px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 750;
 }
 
 .plan-row {
@@ -4244,7 +4546,77 @@ button {
   }
 
   .result-actions {
-    grid-template-columns: 1fr;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .result-action-btn {
+    min-width: 0;
+    min-height: 50px;
+    padding: 0 12px;
+    font-size: 15px;
+  }
+
+  .result-action-btn.share-primary {
+    grid-column: 1 / -1;
+  }
+
+  .result-save-label-full {
+    display: none;
+  }
+
+  .result-save-label-short {
+    display: inline;
+  }
+
+  .share-overlay {
+    align-items: end;
+    justify-items: stretch;
+    padding: 0;
+  }
+
+  .share-sheet {
+    width: 100%;
+    border-radius: 28px 28px 0 0;
+    padding: 18px 18px max(22px, env(safe-area-inset-bottom));
+  }
+
+  .share-sheet-handle {
+    display: block;
+    width: 46px;
+    height: 5px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: rgba(29, 28, 31, 0.14);
+  }
+
+  .share-close {
+    top: 18px;
+    right: 18px;
+  }
+
+  .share-sheet-head {
+    margin-bottom: 18px;
+    padding: 8px 34px 0;
+  }
+
+  .share-sheet-head h2 {
+    font-size: 27px;
+  }
+
+  .share-channel-grid {
+    gap: 8px;
+  }
+
+  .share-channel {
+    border-radius: 14px;
+    padding: 12px 6px 11px;
+    font-size: 11.5px;
+  }
+
+  .share-copy-row {
+    margin-top: 12px;
   }
 
   .result-thinking {
@@ -4273,6 +4645,42 @@ button {
   .account-summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .journal-empty-card {
+    border-radius: 20px;
+  }
+
+  .journal-empty-main {
+    padding: 52px 24px 36px;
+  }
+
+  .journal-empty-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 18px;
+  }
+
+  .journal-empty-main h2 {
+    font-size: 27px;
+  }
+
+  .journal-empty-main p {
+    font-size: 14px;
+  }
+
+  .journal-empty-cta {
+    width: 100%;
+  }
+
+  .journal-plan-footer {
+    grid-template-columns: auto 1fr;
+    padding: 16px;
+  }
+
+  .journal-plan-footer button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .seo-copy h2,
