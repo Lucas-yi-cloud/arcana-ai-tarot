@@ -56,6 +56,7 @@ type TrackEvent =
   | "result_view"
   | "share_open"
   | "share_click"
+  | "partner_recommendation_click"
   | "followup_click"
   | "upsell_click"
   | "new_reading_click"
@@ -1466,6 +1467,127 @@ function SeoSection({
             );
           })}
         </div>
+      </div>
+    </section>
+  );
+}
+
+const partnerProducts = [
+  {
+    name: "Custom Stand Up Pouches",
+    price: "$0.31",
+    url: "https://dylign.com/products/custom-stand-up-pouches",
+    image: "https://cdn.dylign.com/assets/963f4d57efd021db/stand-up-pouch-classic.webp",
+  },
+  {
+    name: "Custom Flat Bottom Pouches",
+    price: "$0.50",
+    url: "https://dylign.com/products/custom-flat-bottom-pouches",
+    image: "https://cdn.dylign.com/assets/f9a9782b2db5241f/flat-bottom-pouch-classic.webp",
+  },
+  {
+    name: "Custom Mailer Boxes",
+    price: "$0.61",
+    url: "https://dylign.com/products/custom-mailer-boxes",
+    image: "https://cdn.dylign.com/assets/6aded1fbd5d26c0c/folding-carton-white-card.webp",
+  },
+  {
+    name: "Custom Folding Cartons",
+    price: "$0.31",
+    url: "https://dylign.com/products/custom-folding-cartons",
+    image: "https://cdn.dylign.com/assets/d7fac527901108e8/mailer-box-white-card.webp",
+  },
+  {
+    name: "Custom Stick Packs",
+    price: "$0.14",
+    url: "https://dylign.com/products/custom-stick-packs",
+    image: "https://cdn.dylign.com/assets/d043121e314873a2/stick-pack-classic.webp",
+  },
+  {
+    name: "Custom Flat Pouches",
+    price: "$0.13",
+    url: "https://dylign.com/products/custom-flat-pouches",
+    image: "https://cdn.dylign.com/assets/6454b0b3def27590/flat-pouch-classic.webp",
+  },
+  {
+    name: "Custom Retail Shopping Bags",
+    price: "$0.49",
+    url: "https://dylign.com/products/custom-retail-shopping-bags",
+    image: "https://cdn.dylign.com/assets/f16cb6cf3dab545f/shopping-bag-white-card.webp",
+  },
+] as const;
+
+function ArrowRightIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function PartnerRecommendations({
+  onOutboundClick,
+}: {
+  onOutboundClick: (productName: string, url: string, source: "view_all" | "product_card") => void;
+}) {
+  return (
+    <section className="partner-section" aria-label="Recommended: custom packaging by Dylign">
+      <div className="partner-head">
+        <div className="partner-title-row">
+          <span className="partner-badge">RECOMMENDED</span>
+          <h2 className="serif">Bring your brand to life</h2>
+        </div>
+        <a
+          className="partner-view-all"
+          href="https://dylign.com/products"
+          target="_blank"
+          rel="noopener noreferrer dofollow"
+          onClick={() => onOutboundClick("All packaging", "https://dylign.com/products", "view_all")}
+        >
+          View all packaging
+          <ArrowRightIcon />
+        </a>
+      </div>
+      <p className="partner-intro">
+        Custom packaging for growing brands from <strong>Dylign</strong> — boxes,
+        pouches and bags from 100 units. Design online in 3D and get an instant price.
+      </p>
+      <div className="partner-grid">
+        {partnerProducts.map((product) => (
+          <a
+            className="partner-card"
+            href={product.url}
+            key={product.url}
+            target="_blank"
+            rel="noopener noreferrer dofollow"
+            onClick={() => onOutboundClick(product.name, product.url, "product_card")}
+          >
+            <div className="partner-image">
+              <img src={product.image} alt={product.name} loading="lazy" />
+            </div>
+            <div className="partner-card-body">
+              <span className="partner-moq">100 MOQ</span>
+              <h3>{product.name}</h3>
+              <div className="partner-card-foot">
+                <span>
+                  From <strong>{product.price}</strong>/unit
+                </span>
+                <ArrowRightIcon />
+              </div>
+            </div>
+          </a>
+        ))}
       </div>
     </section>
   );
@@ -3635,6 +3757,16 @@ export default function TarotApp({
             ))}
           </div>
           <SeoSection openFaq={openFaq} onToggleFaq={(index) => setOpenFaq((current) => (current === index ? -1 : index))} />
+          <PartnerRecommendations
+            onOutboundClick={(productName, url, source) =>
+              track("partner_recommendation_click", {
+                partner: "Dylign",
+                product_name: productName,
+                outbound_url: url,
+                source,
+              })
+            }
+          />
           <SiteFooter
             onOpenSpread={openSpread}
             onGoHome={beginAtSpreads}
